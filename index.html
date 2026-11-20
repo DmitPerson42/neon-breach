@@ -1,0 +1,3247 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>НЕОНОВЫЙ ПРОРЫВ — Киберпанк Роуглайк</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    /* ==========================================================================
+       БАЗОВЫЕ СТИЛИ И КИБЕРПАНК-ТЕМА
+       ========================================================================== */
+    :root {
+      --bg-dark: #050711;
+      --bg-panel: rgba(8, 13, 28, 0.88);
+      --cyan: #00f3ff;
+      --magenta: #ff00aa;
+      --yellow: #fcee0a;
+      --purple: #a855f7;
+      --red: #ff2a55;
+      --green: #00ff88;
+      --text-main: #e2f1ff;
+      --text-dim: #7b93b5;
+      --border-glow: rgba(0, 243, 255, 0.35);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      font-family: 'Rajdhani', 'Segoe UI', sans-serif;
+      touch-action: none;
+    }
+
+    /* Игровой холст */
+    #gameCanvas {
+      display: block;
+      width: 100vw;
+      height: 100vh;
+      cursor: crosshair;
+    }
+
+    /* Эффект CRT-сканлайнов поверх экрана */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      background:
+        linear-gradient(
+          rgba(18, 16, 16, 0) 50%,
+          rgba(0, 0, 0, 0.22) 50%
+        ),
+        radial-gradient(circle at center, transparent 58%, rgba(2, 4, 12, 0.65) 100%);
+      background-size: 100% 4px, 100% 100%;
+    }
+
+    /* ==========================================================================
+       ИГРОВОЙ ИНТЕРФЕЙС (HUD)
+       ========================================================================== */
+    #hud {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 16px 20px;
+      transition: opacity 0.25s ease;
+    }
+
+    #hud.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .hud-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .hud-panel {
+      background: var(--bg-panel);
+      border: 1px solid var(--border-glow);
+      border-radius: 10px;
+      padding: 10px 14px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 0 18px rgba(0, 243, 255, 0.12), inset 0 0 12px rgba(0, 243, 255, 0.05);
+    }
+
+    /* Левая панель: HP, Щит, Рывок */
+    .status-panel {
+      min-width: 240px;
+      max-width: 300px;
+    }
+
+    .bar-group {
+      margin-bottom: 8px;
+    }
+    .bar-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .bar-label {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      margin-bottom: 3px;
+      text-transform: uppercase;
+    }
+
+    .bar-track {
+      width: 100%;
+      height: 10px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .bar-fill {
+      height: 100%;
+      width: 100%;
+      border-radius: 4px;
+      transition: width 0.12s ease-out;
+    }
+
+    .bar-hp {
+      background: linear-gradient(90deg, #ff1e56, #ff5e7e);
+      box-shadow: 0 0 10px rgba(255, 42, 85, 0.7);
+    }
+
+    .bar-shield {
+      background: linear-gradient(90deg, #009dff, #00f3ff);
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.7);
+    }
+
+    .bar-dash {
+      background: linear-gradient(90deg, #eab308, #fcee0a);
+      box-shadow: 0 0 10px rgba(252, 238, 10, 0.65);
+    }
+
+    /* Центральная панель: Сектор и Босс */
+    .center-hud {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .sector-badge {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 8px 20px;
+      font-family: 'Orbitron', sans-serif;
+    }
+
+    .stat-chip {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .stat-chip .label {
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+
+    .stat-chip .value {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--cyan);
+      text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+    }
+
+    .stat-chip .value.enemies-val {
+      color: var(--magenta);
+      text-shadow: 0 0 10px rgba(255, 0, 170, 0.5);
+    }
+
+    .stat-chip .value.score-val {
+      color: var(--yellow);
+      text-shadow: 0 0 10px rgba(252, 238, 10, 0.5);
+    }
+
+    /* Полоса здоровья босса */
+    #bossBarContainer {
+      width: min(460px, 85vw);
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      border-color: rgba(255, 42, 85, 0.6);
+      box-shadow: 0 0 24px rgba(255, 42, 85, 0.3);
+    }
+
+    #bossBarContainer.visible {
+      display: flex;
+    }
+
+    .boss-title {
+      display: flex;
+      justify-content: space-between;
+      font-family: 'Orbitron', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--red);
+      letter-spacing: 0.1em;
+      text-shadow: 0 0 8px rgba(255, 42, 85, 0.8);
+    }
+
+    .boss-track {
+      height: 14px;
+      background: rgba(255, 42, 85, 0.15);
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 42, 85, 0.5);
+    }
+
+    .boss-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #ff0055, #ff00aa, #ff5e00);
+      box-shadow: 0 0 16px rgba(255, 0, 128, 0.85);
+      transition: width 0.1s linear;
+    }
+
+    /* Правые кнопки управления (Звук, Пауза) */
+    .hud-controls {
+      display: flex;
+      gap: 8px;
+      pointer-events: auto;
+    }
+
+    .icon-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 10px;
+      border: 1px solid var(--border-glow);
+      background: var(--bg-panel);
+      color: var(--cyan);
+      font-size: 18px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.18s ease;
+      backdrop-filter: blur(8px);
+    }
+
+    .icon-btn:hover {
+      background: rgba(0, 243, 255, 0.18);
+      box-shadow: 0 0 16px rgba(0, 243, 255, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .icon-btn.muted {
+      color: var(--text-dim);
+      border-color: rgba(123, 147, 181, 0.3);
+    }
+
+    /* Нижняя панель: установленные импланты и уведомления */
+    .hud-bottom {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 12px;
+    }
+
+    #implantsBar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      max-width: 65vw;
+      pointer-events: auto;
+    }
+
+    .implant-chip {
+      position: relative;
+      width: 38px;
+      height: 38px;
+      border-radius: 8px;
+      background: rgba(10, 16, 35, 0.9);
+      border: 1px solid var(--cyan);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      box-shadow: 0 0 10px rgba(0, 243, 255, 0.25);
+      cursor: help;
+    }
+
+    .implant-chip .stack-count {
+      position: absolute;
+      bottom: -4px;
+      right: -4px;
+      background: var(--yellow);
+      color: #050711;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 0 4px;
+      border-radius: 4px;
+      line-height: 14px;
+    }
+
+    .implant-chip:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 46px;
+      left: 0;
+      white-space: nowrap;
+      background: rgba(5, 9, 22, 0.96);
+      border: 1px solid var(--cyan);
+      color: var(--text-main);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-family: 'Rajdhani', sans-serif;
+      z-index: 100;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.7);
+      pointer-events: none;
+    }
+
+    /* Всплывающее уведомление внизу по центру */
+    #bannerNotice {
+      position: fixed;
+      top: 108px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-10px);
+      background: rgba(6, 12, 28, 0.92);
+      border: 1px solid var(--cyan);
+      color: var(--cyan);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      padding: 10px 24px;
+      border-radius: 8px;
+      box-shadow: 0 0 24px rgba(0, 243, 255, 0.4);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.3s ease;
+      z-index: 15;
+      text-align: center;
+      text-transform: uppercase;
+    }
+
+    #bannerNotice.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ==========================================================================
+       МОДАЛЬНЫЕ ОКНА (СТАРТ, ИМПЛАНТЫ, ПАУЗА, GAME OVER)
+       ========================================================================== */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      background: rgba(4, 6, 16, 0.82);
+      backdrop-filter: blur(8px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease;
+    }
+
+    .overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal-card {
+      background: linear-gradient(160deg, rgba(10, 16, 36, 0.96), rgba(5, 8, 20, 0.98));
+      border: 1px solid rgba(0, 243, 255, 0.45);
+      border-radius: 16px;
+      padding: 32px 36px;
+      max-width: 680px;
+      width: 100%;
+      text-align: center;
+      box-shadow:
+        0 0 40px rgba(0, 243, 255, 0.16),
+        0 0 80px rgba(255, 0, 170, 0.08),
+        inset 0 0 24px rgba(0, 243, 255, 0.05);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .modal-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--yellow));
+    }
+
+    .game-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 900;
+      letter-spacing: 0.08em;
+      background: linear-gradient(90deg, #00f3ff, #ffffff, #ff00aa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 0 18px rgba(0, 243, 255, 0.5));
+      margin-bottom: 4px;
+    }
+
+    .game-subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      letter-spacing: 0.32em;
+      color: var(--magenta);
+      text-transform: uppercase;
+      margin-bottom: 22px;
+      text-shadow: 0 0 10px rgba(255, 0, 170, 0.6);
+    }
+
+    .controls-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 10px;
+      margin: 20px 0 24px;
+      text-align: left;
+    }
+
+    .ctrl-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(0, 243, 255, 0.18);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .ctrl-key {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--yellow);
+    }
+
+    .ctrl-desc {
+      font-size: 13px;
+      color: var(--text-dim);
+    }
+
+    .record-box {
+      display: inline-flex;
+      gap: 20px;
+      padding: 8px 18px;
+      border-radius: 8px;
+      background: rgba(252, 238, 10, 0.08);
+      border: 1px solid rgba(252, 238, 10, 0.35);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--yellow);
+      margin-bottom: 24px;
+    }
+
+    /* Кибер-кнопки */
+    .cyber-btn {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding: 14px 34px;
+      border-radius: 10px;
+      border: 1px solid var(--cyan);
+      background: linear-gradient(135deg, rgba(0, 243, 255, 0.2), rgba(255, 0, 170, 0.2));
+      color: #ffffff;
+      cursor: pointer;
+      box-shadow: 0 0 22px rgba(0, 243, 255, 0.35);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+
+    .cyber-btn:hover {
+      transform: translateY(-2px) scale(1.02);
+      background: linear-gradient(135deg, rgba(0, 243, 255, 0.4), rgba(255, 0, 170, 0.35));
+      box-shadow: 0 0 32px rgba(0, 243, 255, 0.65);
+    }
+
+    .cyber-btn:active {
+      transform: translateY(0) scale(0.99);
+    }
+
+    .cyber-btn.secondary {
+      border-color: rgba(123, 147, 181, 0.5);
+      background: rgba(255, 255, 255, 0.05);
+      box-shadow: none;
+    }
+
+    .cyber-btn.secondary:hover {
+      border-color: var(--cyan);
+      background: rgba(0, 243, 255, 0.12);
+    }
+
+    .cyber-btn.danger {
+      border-color: var(--red);
+      background: linear-gradient(135deg, rgba(255, 42, 85, 0.25), rgba(255, 0, 170, 0.2));
+      box-shadow: 0 0 22px rgba(255, 42, 85, 0.35);
+    }
+
+    .cyber-btn.danger:hover {
+      background: linear-gradient(135deg, rgba(255, 42, 85, 0.45), rgba(255, 0, 170, 0.35));
+      box-shadow: 0 0 32px rgba(255, 42, 85, 0.65);
+    }
+
+    /* Карточки выбора имплантов */
+    .implants-modal {
+      max-width: 920px;
+    }
+
+    .implants-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+      gap: 16px;
+      margin-top: 22px;
+    }
+
+    .implant-card {
+      background: linear-gradient(180deg, rgba(14, 22, 48, 0.95), rgba(7, 11, 26, 0.98));
+      border: 1px solid rgba(0, 243, 255, 0.35);
+      border-radius: 14px;
+      padding: 20px 18px;
+      cursor: pointer;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: all 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .implant-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6), 0 0 24px var(--card-glow, rgba(0, 243, 255, 0.5));
+      border-color: var(--card-color, var(--cyan));
+    }
+
+    .implant-card .rarity-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--card-color, var(--cyan));
+    }
+
+    .implant-card .implant-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--card-color, var(--cyan));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 26px;
+      box-shadow: inset 0 0 14px var(--card-glow, rgba(0, 243, 255, 0.25));
+    }
+
+    .implant-card .implant-name {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .implant-card .implant-desc {
+      font-size: 14px;
+      line-height: 1.4;
+      color: #b7cae3;
+      flex: 1;
+    }
+
+    .implant-card .implant-cta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--card-color, var(--cyan));
+      margin-top: 6px;
+      letter-spacing: 0.08em;
+    }
+
+    /* Статистика на экране Game Over */
+    .stats-summary {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin: 22px 0 26px;
+    }
+
+    .summary-box {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      padding: 12px;
+    }
+
+    .summary-box .s-label {
+      font-size: 12px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .summary-box .s-val {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-top: 4px;
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    /* Мобильное сенсорное управление (показывается только на тач-устройствах) */
+    #touchControls {
+      display: none;
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 12;
+    }
+
+    .touch-stick-area {
+      position: absolute;
+      bottom: 28px;
+      left: 28px;
+      width: 128px;
+      height: 128px;
+      border-radius: 50%;
+      background: rgba(0, 243, 255, 0.08);
+      border: 2px solid rgba(0, 243, 255, 0.35);
+      pointer-events: auto;
+      touch-action: none;
+    }
+
+    .touch-stick-knob {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 48px;
+      height: 48px;
+      margin-left: -24px;
+      margin-top: -24px;
+      border-radius: 50%;
+      background: rgba(0, 243, 255, 0.55);
+      box-shadow: 0 0 16px rgba(0, 243, 255, 0.8);
+    }
+
+    .touch-actions {
+      position: absolute;
+      bottom: 32px;
+      right: 28px;
+      display: flex;
+      gap: 14px;
+      pointer-events: auto;
+    }
+
+    .touch-btn {
+      width: 68px;
+      height: 68px;
+      border-radius: 50%;
+      border: 2px solid var(--yellow);
+      background: rgba(252, 238, 10, 0.16);
+      color: var(--yellow);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 16px rgba(252, 238, 10, 0.3);
+      touch-action: none;
+    }
+
+    .touch-btn.fire-btn {
+      border-color: var(--magenta);
+      background: rgba(255, 0, 170, 0.18);
+      color: var(--magenta);
+      box-shadow: 0 0 16px rgba(255, 0, 170, 0.35);
+    }
+
+    @media (max-width: 720px) {
+      #hud {
+        padding: 10px 12px;
+      }
+      .status-panel {
+        min-width: 170px;
+      }
+      .sector-badge {
+        padding: 6px 12px;
+        gap: 10px;
+      }
+      .stat-chip .value {
+        font-size: 15px;
+      }
+      .modal-card {
+        padding: 22px 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Игровой холст -->
+  <canvas id="gameCanvas"></canvas>
+
+  <!-- Эффект сканлайнов -->
+  <div class="scanlines"></div>
+
+  <!-- Всплывающее оповещение (открытие портала, босс и т.д.) -->
+  <div id="bannerNotice">СЕКТОР ЗАЧИЩЕН — ПОРТАЛ АКТИВИРОВАН</div>
+
+  <!-- Игровой HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <!-- Левая панель: Здоровье, Щит, Рывок -->
+      <div class="hud-panel status-panel">
+        <div class="bar-group">
+          <div class="bar-label">
+            <span style="color: var(--red);">♥ БИО-ЦЕЛОСТНОСТЬ</span>
+            <span id="hpText">100 / 100</span>
+          </div>
+          <div class="bar-track">
+            <div id="hpFill" class="bar-fill bar-hp"></div>
+          </div>
+        </div>
+        <div class="bar-group" id="shieldBarGroup" style="display: none;">
+          <div class="bar-label">
+            <span style="color: var(--cyan);">◈ ЭНЕРГОЩИТ</span>
+            <span id="shieldText">0 / 0</span>
+          </div>
+          <div class="bar-track">
+            <div id="shieldFill" class="bar-fill bar-shield"></div>
+          </div>
+        </div>
+        <div class="bar-group">
+          <div class="bar-label">
+            <span style="color: var(--yellow);">⚡ КИБЕР-РЫВОК</span>
+            <span id="dashText">ГОТОВ</span>
+          </div>
+          <div class="bar-track">
+            <div id="dashFill" class="bar-fill bar-dash"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Центр: Сектор, Враги, Очки + Полоса Босса -->
+      <div class="center-hud">
+        <div class="hud-panel sector-badge">
+          <div class="stat-chip">
+            <span class="label">СЕКТОР</span>
+            <span id="sectorVal" class="value">01</span>
+          </div>
+          <div class="stat-chip">
+            <span class="label">УГРОЗЫ</span>
+            <span id="enemiesVal" class="value enemies-val">0</span>
+          </div>
+          <div class="stat-chip">
+            <span class="label">ДАННЫЕ</span>
+            <span id="scoreVal" class="value score-val">0</span>
+          </div>
+        </div>
+
+        <div id="bossBarContainer" class="hud-panel">
+          <div class="boss-title">
+            <span id="bossName">ЯДРО ИИ «КРОНОС-MK1»</span>
+            <span id="bossHpText">100%</span>
+          </div>
+          <div class="boss-track">
+            <div id="bossHpFill" class="boss-fill"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Правые кнопки -->
+      <div class="hud-controls">
+        <button id="muteBtn" class="icon-btn" title="Включить / выключить звук">🔊</button>
+        <button id="pauseBtn" class="icon-btn" title="Пауза (Esc / P)">⏸</button>
+      </div>
+    </div>
+
+    <div class="hud-bottom">
+      <div id="implantsBar"></div>
+    </div>
+  </div>
+
+  <!-- Сенсорное управление для мобильных -->
+  <div id="touchControls">
+    <div id="touchStickArea" class="touch-stick-area">
+      <div id="touchStickKnob" class="touch-stick-knob"></div>
+    </div>
+    <div class="touch-actions">
+      <button id="touchDashBtn" class="touch-btn">РЫВОК</button>
+      <button id="touchFireBtn" class="touch-btn fire-btn">ОГОНЬ</button>
+    </div>
+  </div>
+
+  <!-- СТАРТОВЫЙ ЭКРАН -->
+  <div id="startOverlay" class="overlay active">
+    <div class="modal-card">
+      <h1 class="game-title">НЕОНОВЫЙ ПРОРЫВ</h1>
+      <div class="game-subtitle">NEON BREACH // CYBERPUNK ROGUELIKE</div>
+      <p style="color: #b7cae3; font-size: 15px; line-height: 1.5;">
+        Прорвитесь сквозь защитные сектора мегакорпорации, уничтожайте боевых дронов и ядра ИИ,
+        устанавливайте кибер-импланты и соберите идеальный боевой билд.
+      </p>
+
+      <div class="controls-grid">
+        <div class="ctrl-item">
+          <span class="ctrl-key">WASD / СТРЕЛКИ</span>
+          <span class="ctrl-desc">Перемещение по сектору</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-key">МЫШЬ + ЛКМ</span>
+          <span class="ctrl-desc">Прицеливание и огонь</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-key">ПРОБЕЛ / SHIFT</span>
+          <span class="ctrl-desc">Кибер-рывок (неуязвимость)</span>
+        </div>
+        <div class="ctrl-item">
+          <span class="ctrl-key">ESC / P</span>
+          <span class="ctrl-desc">Пауза системы</span>
+        </div>
+      </div>
+
+      <div class="record-box">
+        <span>🏆 РЕКОРД: <strong id="bestScoreDisplay">0</strong></span>
+        <span>⬡ МАКС. СЕКТОР: <strong id="bestSectorDisplay">0</strong></span>
+      </div>
+
+      <div>
+        <button id="startBtn" class="cyber-btn">▶ НАЧАТЬ ВЗЛОМ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ЭКРАН ВЫБОРА КИБЕР-ИМПЛАНТА -->
+  <div id="implantOverlay" class="overlay">
+    <div class="modal-card implants-modal">
+      <div class="game-subtitle" style="margin-bottom: 6px;">СЕКТОР ЗАЧИЩЕН // ДОСТУП К ТЕРМИНАЛУ</div>
+      <h2 class="game-title" style="font-size: clamp(22px, 3.6vw, 34px);">ВЫБЕРИТЕ КИБЕР-ИМПЛАНТ</h2>
+      <p style="color: var(--text-dim); font-size: 14px;">
+        Выберите один модуль для интеграции в вашу нейросеть перед переходом в следующий сектор.
+      </p>
+      <div id="implantsGrid" class="implants-grid"></div>
+    </div>
+  </div>
+
+  <!-- ЭКРАН ПАУЗЫ -->
+  <div id="pauseOverlay" class="overlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="game-subtitle" style="margin-bottom: 6px;">СИСТЕМА ПРИОСТАНОВЛЕНА</div>
+      <h2 class="game-title" style="font-size: 32px; margin-bottom: 24px;">ПАУЗА</h2>
+      <div class="btn-row" style="flex-direction: column;">
+        <button id="resumeBtn" class="cyber-btn">▶ ПРОДОЛЖИТЬ</button>
+        <button id="pauseMuteBtn" class="cyber-btn secondary">🔊 ЗВУК: ВКЛ</button>
+        <button id="pauseRestartBtn" class="cyber-btn danger">↻ НАЧАТЬ ЗАНОВО</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ЭКРАН GAME OVER -->
+  <div id="gameOverOverlay" class="overlay">
+    <div class="modal-card" style="max-width: 540px; border-color: rgba(255, 42, 85, 0.55);">
+      <div class="game-subtitle" style="color: var(--red); margin-bottom: 6px;">КРИТИЧЕСКИЙ СБОЙ НЕЙРОСЕТИ</div>
+      <h2 class="game-title" style="font-size: clamp(26px, 4.5vw, 38px); background: linear-gradient(90deg, #ff2a55, #ff88aa, #fcee0a); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+        СИСТЕМА ОТКЛЮЧЕНА
+      </h2>
+
+      <div class="stats-summary">
+        <div class="summary-box">
+          <div class="s-label">ПРОЙДЕНО СЕКТОРОВ</div>
+          <div id="goSectors" class="s-val">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">УНИЧТОЖЕНО ВРАГОВ</div>
+          <div id="goKills" class="s-val" style="color: var(--magenta);">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">ОЧКИ ДАННЫХ</div>
+          <div id="goScore" class="s-val" style="color: var(--yellow);">0</div>
+        </div>
+        <div class="summary-box">
+          <div class="s-label">ЛУЧШИЙ РЕКОРД</div>
+          <div id="goBest" class="s-val" style="color: var(--green);">0</div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button id="restartBtn" class="cyber-btn">↻ ПЕРЕЗАГРУЗИТЬ</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (() => {
+      'use strict';
+
+      /* ==========================================================================
+         1. ЗВУКОВОЙ СИНТЕЗАТОР (WEB AUDIO API)
+         ========================================================================== */
+      class CyberAudio {
+        constructor() {
+          this.ctx = null;
+          this.muted = false;
+        }
+
+        init() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) {
+              this.ctx = new AudioCtx();
+            }
+          }
+          if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume().catch(() => {});
+          }
+        }
+
+        toggleMute() {
+          this.muted = !this.muted;
+          return this.muted;
+        }
+
+        playTone({ freq = 440, endFreq = null, type = 'sawtooth', duration = 0.12, volume = 0.12, delay = 0 }) {
+          if (this.muted || !this.ctx) return;
+          try {
+            const now = this.ctx.currentTime + delay;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, now);
+            if (endFreq !== null) {
+              osc.frequency.exponentialRampToValueAtTime(Math.max(20, endFreq), now + duration);
+            }
+            gain.gain.setValueAtTime(volume, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + duration + 0.01);
+          } catch (_) {}
+        }
+
+        playNoise({ duration = 0.2, volume = 0.15, filterFreq = 800, endFreq = 120 }) {
+          if (this.muted || !this.ctx) return;
+          try {
+            const now = this.ctx.currentTime;
+            const bufferSize = Math.floor(this.ctx.sampleRate * duration);
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+              data[i] = Math.random() * 2 - 1;
+            }
+            const noise = this.ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(filterFreq, now);
+            filter.frequency.exponentialRampToValueAtTime(Math.max(40, endFreq), now + duration);
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(volume, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            noise.start(now);
+          } catch (_) {}
+        }
+
+        shoot() {
+          const pitch = 780 + Math.random() * 140;
+          this.playTone({ freq: pitch, endFreq: 180, type: 'sawtooth', duration: 0.08, volume: 0.07 });
+          this.playTone({ freq: pitch * 1.5, endFreq: 320, type: 'triangle', duration: 0.05, volume: 0.05 });
+        }
+
+        droneShoot() {
+          this.playTone({ freq: 1100, endFreq: 420, type: 'sine', duration: 0.06, volume: 0.04 });
+        }
+
+        enemyShoot() {
+          this.playTone({ freq: 340, endFreq: 120, type: 'square', duration: 0.09, volume: 0.05 });
+        }
+
+        sniperShoot() {
+          this.playTone({ freq: 1400, endFreq: 160, type: 'sawtooth', duration: 0.22, volume: 0.12 });
+          this.playNoise({ duration: 0.12, volume: 0.08, filterFreq: 2200, endFreq: 400 });
+        }
+
+        dash(hasEmp) {
+          this.playTone({ freq: 240, endFreq: 760, type: 'sine', duration: 0.14, volume: 0.1 });
+          this.playNoise({ duration: 0.14, volume: 0.07, filterFreq: 1800, endFreq: 300 });
+          if (hasEmp) {
+            this.playTone({ freq: 520, endFreq: 90, type: 'sawtooth', duration: 0.26, volume: 0.12 });
+          }
+        }
+
+        hit() {
+          this.playTone({ freq: 260 + Math.random() * 80, endFreq: 90, type: 'triangle', duration: 0.05, volume: 0.07 });
+        }
+
+        playerHurt(shielded) {
+          if (shielded) {
+            this.playTone({ freq: 620, endFreq: 220, type: 'sine', duration: 0.16, volume: 0.12 });
+          } else {
+            this.playTone({ freq: 160, endFreq: 45, type: 'sawtooth', duration: 0.22, volume: 0.16 });
+            this.playNoise({ duration: 0.16, volume: 0.12, filterFreq: 700, endFreq: 100 });
+          }
+        }
+
+        explosion(big = false) {
+          this.playNoise({
+            duration: big ? 0.55 : 0.24,
+            volume: big ? 0.22 : 0.13,
+            filterFreq: big ? 1200 : 900,
+            endFreq: 60
+          });
+          this.playTone({
+            freq: big ? 140 : 180,
+            endFreq: 32,
+            type: 'sine',
+            duration: big ? 0.5 : 0.22,
+            volume: big ? 0.2 : 0.12
+          });
+        }
+
+        pickup() {
+          this.playTone({ freq: 660, endFreq: 990, type: 'sine', duration: 0.09, volume: 0.08 });
+          this.playTone({ freq: 990, endFreq: 1320, type: 'triangle', duration: 0.11, volume: 0.07, delay: 0.06 });
+        }
+
+        portalOpen() {
+          this.playTone({ freq: 220, endFreq: 440, type: 'sine', duration: 0.25, volume: 0.1 });
+          this.playTone({ freq: 330, endFreq: 660, type: 'triangle', duration: 0.3, volume: 0.09, delay: 0.1 });
+          this.playTone({ freq: 440, endFreq: 880, type: 'sine', duration: 0.35, volume: 0.09, delay: 0.2 });
+        }
+
+        implantSelect() {
+          this.playTone({ freq: 440, endFreq: 554, type: 'triangle', duration: 0.1, volume: 0.1 });
+          this.playTone({ freq: 554, endFreq: 659, type: 'triangle', duration: 0.1, volume: 0.1, delay: 0.08 });
+          this.playTone({ freq: 659, endFreq: 880, type: 'sine', duration: 0.22, volume: 0.12, delay: 0.16 });
+        }
+
+        bossWarning() {
+          for (let i = 0; i < 3; i++) {
+            this.playTone({ freq: 180, endFreq: 120, type: 'sawtooth', duration: 0.18, volume: 0.12, delay: i * 0.22 });
+          }
+        }
+      }
+
+      const audio = new CyberAudio();
+
+      /* ==========================================================================
+         2. КАТАЛОГ КИБЕР-ИМПЛАНТОВ (11 УНИКАЛЬНЫХ МОДУЛЕЙ)
+         ========================================================================== */
+      const RARITY = {
+        common: { label: 'ОБЫЧНЫЙ', color: '#00f3ff', glow: 'rgba(0, 243, 255, 0.45)', weight: 45 },
+        rare: { label: 'РЕДКИЙ', color: '#a855f7', glow: 'rgba(168, 85, 247, 0.5)', weight: 32 },
+        epic: { label: 'ЭПИЧЕСКИЙ', color: '#ff00aa', glow: 'rgba(255, 0, 170, 0.55)', weight: 18 },
+        legendary: { label: 'ЛЕГЕНДАРНЫЙ', color: '#fcee0a', glow: 'rgba(252, 238, 10, 0.55)', weight: 10 }
+      };
+
+      const IMPLANTS = [
+        {
+          id: 'multishot',
+          name: 'Мультиствол',
+          icon: '🔱',
+          rarity: 'epic',
+          desc: '+1 дополнительная пуля в залпе веером. Идеально для зачистки толп.',
+          apply: (p) => { p.multishot += 1; }
+        },
+        {
+          id: 'overclock',
+          name: 'Разгон процессора',
+          icon: '⚡',
+          rarity: 'common',
+          desc: '+25% к скорости стрельбы. Превратите оружие в плазменный ливень.',
+          apply: (p) => { p.fireRateMult *= 1.25; }
+        },
+        {
+          id: 'plasma_core',
+          name: 'Плазменное ядро',
+          icon: '☢️',
+          rarity: 'common',
+          desc: '+35% к урону всех ваших пуль.',
+          apply: (p) => { p.damageMult *= 1.35; }
+        },
+        {
+          id: 'nano_vamp',
+          name: 'Нано-вампиризм',
+          icon: '🩸',
+          rarity: 'rare',
+          desc: 'Восстанавливает +4 HP за каждого уничтоженного врага.',
+          apply: (p) => { p.vampHeal += 4; }
+        },
+        {
+          id: 'cyber_shield',
+          name: 'Кибер-щит',
+          icon: '🛡️',
+          rarity: 'rare',
+          desc: 'Добавляет +40 к восстанавливающемуся энергощиту. Щит регенерирует вне боя.',
+          apply: (p) => {
+            p.maxShield += 40;
+            p.shield = p.maxShield;
+          }
+        },
+        {
+          id: 'railgun',
+          name: 'Пробивной рельсотрон',
+          icon: '☄️',
+          rarity: 'epic',
+          desc: 'Пули пробивают врагов насквозь (+1 пробитие) и летят на 20% быстрее.',
+          apply: (p) => {
+            p.pierce += 1;
+            p.bulletSpeedMult *= 1.2;
+          }
+        },
+        {
+          id: 'emp_dash',
+          name: 'ЭМИ-рывок',
+          icon: '💥',
+          rarity: 'rare',
+          desc: 'Кибер-рывок выпускает мощную ЭМИ-волну, наносящую урон и отталкивающую врагов.',
+          apply: (p) => { p.empLevel += 1; }
+        },
+        {
+          id: 'orbital_drone',
+          name: 'Орбитальный дрон',
+          icon: '🛸',
+          rarity: 'legendary',
+          desc: 'Вокруг вас летает автономный защитный дрон, автоматически стреляющий по врагам.',
+          apply: (p) => { p.droneCount += 1; }
+        },
+        {
+          id: 'servos',
+          name: 'Ускоритель сервоприводов',
+          icon: '💨',
+          rarity: 'common',
+          desc: '+20% к скорости бега и -20% ко времени перезарядки рывка.',
+          apply: (p) => {
+            p.speedMult *= 1.2;
+            p.dashCooldownMult *= 0.8;
+          }
+        },
+        {
+          id: 'ricochet',
+          name: 'Рикошет',
+          icon: '🔀',
+          rarity: 'rare',
+          desc: 'Пули отскакивают от стен и неоновых колонн (+1 отскок).',
+          apply: (p) => { p.bounces += 1; }
+        },
+        {
+          id: 'med_stim',
+          name: 'Мед-стимулятор',
+          icon: '💉',
+          rarity: 'common',
+          desc: '+30 к максимальному здоровью и мгновенное полное восстановление HP.',
+          apply: (p) => {
+            p.maxHp += 30;
+            p.hp = p.maxHp;
+          }
+        }
+      ];
+
+      /* ==========================================================================
+         3. КОНСТАНТЫ И СОСТОЯНИЕ ИГРЫ
+         ========================================================================== */
+      const canvas = document.getElementById('gameCanvas');
+      const ctx = canvas.getContext('2d');
+
+      // Размеры логической арены (сектора)
+      const ARENA_W = 1600;
+      const ARENA_H = 1050;
+
+      const STORAGE_KEY = 'neon_breach_records_v1';
+
+      // DOM-элементы
+      const ui = {
+        hud: document.getElementById('hud'),
+        hpText: document.getElementById('hpText'),
+        hpFill: document.getElementById('hpFill'),
+        shieldBarGroup: document.getElementById('shieldBarGroup'),
+        shieldText: document.getElementById('shieldText'),
+        shieldFill: document.getElementById('shieldFill'),
+        dashText: document.getElementById('dashText'),
+        dashFill: document.getElementById('dashFill'),
+        sectorVal: document.getElementById('sectorVal'),
+        enemiesVal: document.getElementById('enemiesVal'),
+        scoreVal: document.getElementById('scoreVal'),
+        bossBarContainer: document.getElementById('bossBarContainer'),
+        bossName: document.getElementById('bossName'),
+        bossHpText: document.getElementById('bossHpText'),
+        bossHpFill: document.getElementById('bossHpFill'),
+        implantsBar: document.getElementById('implantsBar'),
+        bannerNotice: document.getElementById('bannerNotice'),
+        startOverlay: document.getElementById('startOverlay'),
+        implantOverlay: document.getElementById('implantOverlay'),
+        implantsGrid: document.getElementById('implantsGrid'),
+        pauseOverlay: document.getElementById('pauseOverlay'),
+        gameOverOverlay: document.getElementById('gameOverOverlay'),
+        bestScoreDisplay: document.getElementById('bestScoreDisplay'),
+        bestSectorDisplay: document.getElementById('bestSectorDisplay'),
+        goSectors: document.getElementById('goSectors'),
+        goKills: document.getElementById('goKills'),
+        goScore: document.getElementById('goScore'),
+        goBest: document.getElementById('goBest'),
+        muteBtn: document.getElementById('muteBtn'),
+        pauseMuteBtn: document.getElementById('pauseMuteBtn'),
+        pauseBtn: document.getElementById('pauseBtn'),
+        touchControls: document.getElementById('touchControls'),
+        touchStickArea: document.getElementById('touchStickArea'),
+        touchStickKnob: document.getElementById('touchStickKnob'),
+        touchDashBtn: document.getElementById('touchDashBtn'),
+        touchFireBtn: document.getElementById('touchFireBtn')
+      };
+
+      // Состояние ввода
+      const input = {
+        keys: {},
+        mouseX: 0,
+        mouseY: 0,
+        mouseDown: false,
+        touchMoveX: 0,
+        touchMoveY: 0,
+        touchFire: false,
+        isTouch: false
+      };
+
+      // Глобальное состояние игры
+      let state = {
+        mode: 'menu', // 'menu' | 'playing' | 'implant' | 'paused' | 'gameover'
+        sector: 1,
+        score: 0,
+        kills: 0,
+        time: 0,
+        screenShake: 0,
+        cameraX: ARENA_W / 2,
+        cameraY: ARENA_H / 2,
+        viewW: window.innerWidth,
+        viewH: window.innerHeight,
+        bannerTimer: 0,
+        portal: null, // { x, y, radius, active, pulse }
+        obstacles: [],
+        enemies: [],
+        bullets: [],
+        particles: [],
+        floatingTexts: [],
+        afterimages: [],
+        shockwaves: [],
+        pickups: [],
+        player: null,
+        records: { bestScore: 0, bestSector: 0 }
+      };
+
+      /* ==========================================================================
+         4. ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ И ФИЗИКА
+         ========================================================================== */
+      function clamp(val, min, max) {
+        return Math.max(min, Math.min(max, val));
+      }
+
+      function rand(min, max) {
+        return Math.random() * (max - min) + min;
+      }
+
+      function randInt(min, max) {
+        return Math.floor(rand(min, max + 1));
+      }
+
+      function dist(x1, y1, x2, y2) {
+        return Math.hypot(x2 - x1, y2 - y1);
+      }
+
+      function loadRecords() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            state.records.bestScore = Number(parsed.bestScore) || 0;
+            state.records.bestSector = Number(parsed.bestSector) || 0;
+          }
+        } catch (_) {}
+        ui.bestScoreDisplay.textContent = state.records.bestScore;
+        ui.bestSectorDisplay.textContent = state.records.bestSector;
+      }
+
+      function saveRecords() {
+        if (state.score > state.records.bestScore) {
+          state.records.bestScore = Math.floor(state.score);
+        }
+        if (state.sector > state.records.bestSector) {
+          state.records.bestSector = state.sector;
+        }
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(state.records));
+        } catch (_) {}
+        ui.bestScoreDisplay.textContent = state.records.bestScore;
+        ui.bestSectorDisplay.textContent = state.records.bestSector;
+      }
+
+      function showBanner(text, color = '#00f3ff', duration = 2.6) {
+        ui.bannerNotice.textContent = text;
+        ui.bannerNotice.style.borderColor = color;
+        ui.bannerNotice.style.color = color;
+        ui.bannerNotice.style.boxShadow = `0 0 24px ${color}66`;
+        ui.bannerNotice.classList.add('show');
+        state.bannerTimer = duration;
+      }
+
+      // Столкновение круга с прямоугольником (препятствием)
+      function resolveCircleRect(entity, rect) {
+        const closestX = clamp(entity.x, rect.x, rect.x + rect.w);
+        const closestY = clamp(entity.y, rect.y, rect.y + rect.h);
+        const dx = entity.x - closestX;
+        const dy = entity.y - closestY;
+        const dSq = dx * dx + dy * dy;
+        const r = entity.radius;
+
+        if (dSq < r * r) {
+          const d = Math.sqrt(dSq);
+          if (d > 0.0001) {
+            const overlap = r - d;
+            entity.x += (dx / d) * overlap;
+            entity.y += (dy / d) * overlap;
+          } else {
+            // Центр внутри прямоугольника — выталкиваем по кратчайшему пути
+            const left = entity.x - rect.x;
+            const right = rect.x + rect.w - entity.x;
+            const top = entity.y - rect.y;
+            const bottom = rect.y + rect.h - entity.y;
+            const minEdge = Math.min(left, right, top, bottom);
+            if (minEdge === left) entity.x = rect.x - r;
+            else if (minEdge === right) entity.x = rect.x + rect.w + r;
+            else if (minEdge === top) entity.y = rect.y - r;
+            else entity.y = rect.y + rect.h + r;
+          }
+          return true;
+        }
+        return false;
+      }
+
+      // Проверка попадания точки в прямоугольник
+      function pointInRect(x, y, rect, pad = 0) {
+        return (
+          x >= rect.x - pad &&
+          x <= rect.x + rect.w + pad &&
+          y >= rect.y - pad &&
+          y <= rect.y + rect.h + pad
+        );
+      }
+
+      // Трассировка луча (для лазерного прицела снайпера)
+      function raycastObstacles(x1, y1, angle, maxLen) {
+        const dx = Math.cos(angle);
+        const dy = Math.sin(angle);
+        const step = 10;
+        let len = 0;
+        while (len < maxLen) {
+          const px = x1 + dx * len;
+          const py = y1 + dy * len;
+          if (px <= 0 || px >= ARENA_W || py <= 0 || py >= ARENA_H) {
+            return { x: clamp(px, 0, ARENA_W), y: clamp(py, 0, ARENA_H) };
+          }
+          for (let i = 0; i < state.obstacles.length; i++) {
+            if (pointInRect(px, py, state.obstacles[i], 0)) {
+              return { x: px, y: py };
+            }
+          }
+          len += step;
+        }
+        return { x: x1 + dx * maxLen, y: y1 + dy * maxLen };
+      }
+
+      /* ==========================================================================
+         5. ВИЗУАЛЬНЫЕ ЭФФЕКТЫ (ЧАСТИЦЫ, ТЕКСТ УРОНА, ВОЛНЫ)
+         ========================================================================== */
+      function spawnParticles(x, y, color, count = 12, speed = 220, size = 3.5, life = 0.45) {
+        for (let i = 0; i < count; i++) {
+          const ang = Math.random() * Math.PI * 2;
+          const spd = rand(speed * 0.25, speed);
+          state.particles.push({
+            x,
+            y,
+            vx: Math.cos(ang) * spd,
+            vy: Math.sin(ang) * spd,
+            color,
+            size: rand(size * 0.5, size * 1.3),
+            life: rand(life * 0.5, life),
+            maxLife: life
+          });
+        }
+      }
+
+      function spawnFloatingText(x, y, text, color = '#ffffff', size = 15) {
+        state.floatingTexts.push({
+          x: x + rand(-10, 10),
+          y: y - 10,
+          vy: -55,
+          text,
+          color,
+          size,
+          life: 0.75,
+          maxLife: 0.75
+        });
+      }
+
+      function spawnShockwave(x, y, maxRadius, color, width = 4, duration = 0.35) {
+        state.shockwaves.push({
+          x,
+          y,
+          radius: 10,
+          maxRadius,
+          color,
+          width,
+          life: duration,
+          maxLife: duration
+        });
+      }
+
+      function addScreenShake(amount) {
+        state.screenShake = Math.min(26, state.screenShake + amount);
+      }
+
+      /* ==========================================================================
+         6. СОЗДАНИЕ ИГРОКА И ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ СЕКТОРА
+         ========================================================================== */
+      function createPlayer() {
+        return {
+          x: ARENA_W / 2,
+          y: ARENA_H / 2,
+          radius: 17,
+          angle: 0,
+          hp: 100,
+          maxHp: 100,
+          shield: 0,
+          maxShield: 0,
+          shieldRegenDelay: 0,
+          baseSpeed: 295,
+          speedMult: 1,
+          // Стрельба
+          fireCooldown: 0,
+          baseFireRate: 4.5, // выстрелов/сек
+          fireRateMult: 1,
+          baseDamage: 24,
+          damageMult: 1,
+          bulletSpeedMult: 1,
+          multishot: 1,
+          pierce: 0,
+          bounces: 0,
+          // Рывок
+          dashTimer: 0,
+          dashDuration: 0.17,
+          dashCooldown: 0,
+          baseDashCooldown: 1.75,
+          dashCooldownMult: 1,
+          dashDirX: 0,
+          dashDirY: 0,
+          invulnTimer: 0,
+          // Импланты
+          vampHeal: 0,
+          empLevel: 0,
+          droneCount: 0,
+          droneAngle: 0,
+          droneFireTimer: 0,
+          implants: {}, // { id: count }
+          afterimageTimer: 0
+        };
+      }
+
+      function generateSector(sectorNum) {
+        state.obstacles = [];
+        state.enemies = [];
+        state.bullets = [];
+        state.pickups = [];
+        state.portal = null;
+
+        const p = state.player;
+        p.x = ARENA_W / 2;
+        p.y = ARENA_H / 2;
+        p.invulnTimer = 1.0; // Краткая защита при входе в сектор
+
+        // Генерация неоновых колонн/укрытий (избегаем центра спавна игрока)
+        const obstacleCount = randInt(7, 12);
+        const safeCenterR = 190;
+
+        for (let i = 0; i < obstacleCount; i++) {
+          for (let attempt = 0; attempt < 25; attempt++) {
+            const w = randInt(70, 175);
+            const h = randInt(55, 145);
+            const x = randInt(110, ARENA_W - 110 - w);
+            const y = randInt(110, ARENA_H - 110 - h);
+            const cx = x + w / 2;
+            const cy = y + h / 2;
+
+            // Не перекрывать центр
+            if (dist(cx, cy, ARENA_W / 2, ARENA_H / 2) < safeCenterR + Math.max(w, h) * 0.45) {
+              continue;
+            }
+            // Не накладывать слишком близко к другим колоннам
+            let overlaps = false;
+            for (const o of state.obstacles) {
+              if (
+                x < o.x + o.w + 68 &&
+                x + w + 68 > o.x &&
+                y < o.y + o.h + 68 &&
+                y + h + 68 > o.y
+              ) {
+                overlaps = true;
+                break;
+              }
+            }
+            if (!overlaps) {
+              const accentColors = ['#00f3ff', '#ff00aa', '#a855f7'];
+              state.obstacles.push({
+                x, y, w, h,
+                color: accentColors[i % accentColors.length]
+              });
+              break;
+            }
+          }
+        }
+
+        // Проверка: сектор с Боссом (каждые 4 сектора)
+        const isBossSector = sectorNum % 4 === 0;
+        if (isBossSector) {
+          spawnBoss(sectorNum);
+          // Несколько миньонов-дронов для динамики
+          const escorts = 2 + Math.floor(sectorNum / 4);
+          for (let i = 0; i < escorts; i++) {
+            spawnEnemy('drone', sectorNum);
+          }
+          audio.bossWarning();
+          showBanner(`⚠ ВНИМАНИЕ: ОБНАРУЖЕН БОСС СЕКТОРА ${sectorNum} ⚠`, '#ff2a55', 3.4);
+        } else {
+          const totalEnemies = 5 + Math.floor(sectorNum * 1.9);
+          for (let i = 0; i < totalEnemies; i++) {
+            const roll = Math.random();
+            let type = 'drone';
+            if (sectorNum >= 3 && roll > 0.78) type = 'sniper';
+            else if (sectorNum >= 2 && roll > 0.56) type = 'heavy';
+            else if (roll > 0.32) type = 'shooter';
+            spawnEnemy(type, sectorNum);
+          }
+          showBanner(`СЕКТОР ${String(sectorNum).padStart(2, '0')} // УНИЧТОЖЬТЕ ВСЕ УГРОЗЫ`, '#00f3ff', 2.4);
+        }
+
+        updateHUD();
+      }
+
+      function findSafeSpawnPos(radius, minPlayerDist = 360) {
+        const p = state.player;
+        for (let attempt = 0; attempt < 60; attempt++) {
+          const x = rand(80, ARENA_W - 80);
+          const y = rand(80, ARENA_H - 80);
+          if (dist(x, y, p.x, p.y) < minPlayerDist) continue;
+          let blocked = false;
+          for (const o of state.obstacles) {
+            if (pointInRect(x, y, o, radius + 14)) {
+              blocked = true;
+              break;
+            }
+          }
+          if (!blocked) return { x, y };
+        }
+        return { x: 100, y: 100 };
+      }
+
+      function spawnEnemy(type, sectorNum) {
+        const scale = 1 + (sectorNum - 1) * 0.16;
+        const configs = {
+          drone: {
+            radius: 15,
+            hp: Math.round(42 * scale),
+            speed: 195 + Math.min(80, sectorNum * 6),
+            color: '#ff9900',
+            score: 100,
+            fireCooldown: 999
+          },
+          shooter: {
+            radius: 17,
+            hp: Math.round(62 * scale),
+            speed: 120,
+            color: '#ff2a55',
+            score: 150,
+            fireCooldown: rand(0.9, 1.8)
+          },
+          heavy: {
+            radius: 24,
+            hp: Math.round(135 * scale),
+            speed: 82,
+            color: '#a855f7',
+            score: 260,
+            fireCooldown: rand(1.4, 2.2)
+          },
+          sniper: {
+            radius: 16,
+            hp: Math.round(58 * scale),
+            speed: 105,
+            color: '#fcee0a',
+            score: 220,
+            fireCooldown: rand(1.8, 2.8)
+          }
+        };
+
+        const cfg = configs[type];
+        const pos = findSafeSpawnPos(cfg.radius);
+        state.enemies.push({
+          type,
+          x: pos.x,
+          y: pos.y,
+          vx: 0,
+          vy: 0,
+          radius: cfg.radius,
+          hp: cfg.hp,
+          maxHp: cfg.hp,
+          speed: cfg.speed,
+          color: cfg.color,
+          score: cfg.score,
+          angle: 0,
+          fireTimer: cfg.fireCooldown,
+          aimTimer: 0, // Для снайпера
+          aimAngle: 0,
+          hitFlash: 0,
+          stunTimer: 0,
+          strafeDir: Math.random() < 0.5 ? -1 : 1,
+          isBoss: false
+        });
+      }
+
+      function spawnBoss(sectorNum) {
+        const tier = Math.floor(sectorNum / 4);
+        const bossNames = [
+          'ЯДРО ИИ «КРОНОС-MK1»',
+          'МЕХ-СТРАЖ «НЕМЕЗИДА-X»',
+          'КИБЕР-ЛЕВИАФАН «ОМЕГА»',
+          'СИНГУЛЯРНОСТЬ «АПЕКС-9»'
+        ];
+        const pos = findSafeSpawnPos(54, 420);
+        const maxHp = Math.round(950 * (1 + (tier - 1) * 0.65));
+        state.enemies.push({
+          type: 'boss',
+          name: bossNames[(tier - 1) % bossNames.length],
+          x: pos.x,
+          y: pos.y,
+          vx: 0,
+          vy: 0,
+          radius: 48,
+          hp: maxHp,
+          maxHp,
+          speed: 95 + tier * 10,
+          color: '#ff00aa',
+          score: 1500 * tier,
+          angle: 0,
+          phaseTimer: 1.5,
+          patternIndex: 0,
+          spinAngle: 0,
+          hitFlash: 0,
+          stunTimer: 0,
+          isBoss: true
+        });
+      }
+
+      /* ==========================================================================
+         7. СТРЕЛЬБА, РЫВОК И УРОН
+         ========================================================================== */
+      function firePlayerWeapon() {
+        const p = state.player;
+        const count = p.multishot;
+        const spreadStep = 0.13; // радианы между пулями веера
+        const totalSpread = (count - 1) * spreadStep;
+        const bulletSpeed = 760 * p.bulletSpeedMult;
+        const damage = Math.round(p.baseDamage * p.damageMult);
+
+        for (let i = 0; i < count; i++) {
+          const offset = -totalSpread / 2 + i * spreadStep + rand(-0.02, 0.02);
+          const ang = p.angle + offset;
+          state.bullets.push({
+            fromPlayer: true,
+            x: p.x + Math.cos(ang) * (p.radius + 8),
+            y: p.y + Math.sin(ang) * (p.radius + 8),
+            prevX: p.x,
+            prevY: p.y,
+            vx: Math.cos(ang) * bulletSpeed,
+            vy: Math.sin(ang) * bulletSpeed,
+            radius: 5,
+            damage,
+            color: p.pierce > 0 ? '#fcee0a' : '#00f3ff',
+            pierceLeft: p.pierce,
+            bouncesLeft: p.bounces,
+            hitIds: new Set(),
+            life: 1.8
+          });
+        }
+
+        // Дульная вспышка
+        spawnParticles(
+          p.x + Math.cos(p.angle) * (p.radius + 10),
+          p.y + Math.sin(p.angle) * (p.radius + 10),
+          '#00f3ff',
+          4,
+          140,
+          2.5,
+          0.14
+        );
+        audio.shoot();
+      }
+
+      function triggerDash() {
+        const p = state.player;
+        if (p.dashCooldown > 0 || p.dashTimer > 0) return;
+
+        let dx = 0;
+        let dy = 0;
+        if (input.keys['KeyW'] || input.keys['ArrowUp']) dy -= 1;
+        if (input.keys['KeyS'] || input.keys['ArrowDown']) dy += 1;
+        if (input.keys['KeyA'] || input.keys['ArrowLeft']) dx -= 1;
+        if (input.keys['KeyD'] || input.keys['ArrowRight']) dx += 1;
+
+        if (Math.hypot(input.touchMoveX, input.touchMoveY) > 0.15) {
+          dx = input.touchMoveX;
+          dy = input.touchMoveY;
+        }
+
+        if (dx === 0 && dy === 0) {
+          dx = Math.cos(p.angle);
+          dy = Math.sin(p.angle);
+        } else {
+          const len = Math.hypot(dx, dy);
+          dx /= len;
+          dy /= len;
+        }
+
+        p.dashDirX = dx;
+        p.dashDirY = dy;
+        p.dashTimer = p.dashDuration;
+        p.invulnTimer = Math.max(p.invulnTimer, p.dashDuration + 0.12);
+        p.dashCooldown = p.baseDashCooldown * p.dashCooldownMult;
+
+        spawnParticles(p.x, p.y, '#fcee0a', 14, 240, 3.5, 0.35);
+        audio.dash(p.empLevel > 0);
+
+        // ЭМИ-рывок (если установлен имплант)
+        if (p.empLevel > 0) {
+          const empRadius = 155 + (p.empLevel - 1) * 35;
+          const empDamage = Math.round((45 + (p.empLevel - 1) * 30) * p.damageMult);
+          spawnShockwave(p.x, p.y, empRadius, '#00f3ff', 6, 0.32);
+          addScreenShake(6);
+
+          for (const e of state.enemies) {
+            const d = dist(p.x, p.y, e.x, e.y);
+            if (d <= empRadius + e.radius) {
+              damageEnemy(e, empDamage, '#00f3ff');
+              if (!e.isBoss) {
+                e.stunTimer = Math.max(e.stunTimer, 0.65);
+                const pushAng = Math.atan2(e.y - p.y, e.x - p.x);
+                e.vx += Math.cos(pushAng) * 360;
+                e.vy += Math.sin(pushAng) * 360;
+              }
+            }
+          }
+        }
+      }
+
+      function damagePlayer(amount) {
+        const p = state.player;
+        if (p.invulnTimer > 0 || state.mode !== 'playing') return;
+
+        p.invulnTimer = 0.55;
+        p.shieldRegenDelay = 4.0;
+
+        let remaining = amount;
+        let hitShield = false;
+
+        if (p.shield > 0) {
+          hitShield = true;
+          const absorbed = Math.min(p.shield, remaining);
+          p.shield -= absorbed;
+          remaining -= absorbed;
+          spawnFloatingText(p.x, p.y - 16, `-${Math.round(absorbed)} ЩИТ`, '#00f3ff', 14);
+        }
+
+        if (remaining > 0) {
+          p.hp -= remaining;
+          spawnFloatingText(p.x, p.y - 10, `-${Math.round(remaining)}`, '#ff2a55', 17);
+        }
+
+        audio.playerHurt(hitShield && remaining === 0);
+        addScreenShake(remaining > 0 ? 11 : 6);
+        spawnParticles(p.x, p.y, hitShield && remaining === 0 ? '#00f3ff' : '#ff2a55', 16, 260, 4, 0.4);
+
+        if (p.hp <= 0) {
+          p.hp = 0;
+          triggerGameOver();
+        }
+        updateHUD();
+      }
+
+      function damageEnemy(enemy, amount, textColor = '#ffffff') {
+        enemy.hp -= amount;
+        enemy.hitFlash = 0.1;
+        spawnFloatingText(enemy.x, enemy.y - enemy.radius, `${amount}`, textColor, enemy.isBoss ? 18 : 15);
+        spawnParticles(enemy.x, enemy.y, enemy.color, 6, 170, 3, 0.25);
+        audio.hit();
+
+        if (enemy.hp <= 0 && !enemy._dead) {
+          enemy._dead = true;
+          onEnemyKilled(enemy);
+        }
+      }
+
+      function onEnemyKilled(enemy) {
+        const p = state.player;
+        state.kills += 1;
+        state.score += enemy.score;
+
+        audio.explosion(enemy.isBoss);
+        addScreenShake(enemy.isBoss ? 18 : 6);
+        spawnParticles(enemy.x, enemy.y, enemy.color, enemy.isBoss ? 55 : 22, enemy.isBoss ? 380 : 250, enemy.isBoss ? 5.5 : 4, enemy.isBoss ? 0.85 : 0.45);
+        spawnShockwave(enemy.x, enemy.y, enemy.isBoss ? 180 : 65, enemy.color, enemy.isBoss ? 6 : 3, 0.35);
+
+        // Нано-вампиризм
+        if (p.vampHeal > 0 && p.hp < p.maxHp) {
+          const healed = Math.min(p.vampHeal, p.maxHp - p.hp);
+          p.hp += healed;
+          spawnFloatingText(p.x, p.y - 20, `+${Math.round(healed)} HP`, '#00ff88', 13);
+        }
+
+        // Выпадение мед-ячейки или кристалла данных
+        if (enemy.isBoss || Math.random() < 0.18) {
+          state.pickups.push({
+            x: enemy.x,
+            y: enemy.y,
+            type: 'hp',
+            value: enemy.isBoss ? 40 : 18,
+            radius: 10,
+            pulse: 0
+          });
+        } else if (Math.random() < 0.38) {
+          state.pickups.push({
+            x: enemy.x,
+            y: enemy.y,
+            type: 'data',
+            value: 50,
+            radius: 8,
+            pulse: 0
+          });
+        }
+      }
+
+      /* ==========================================================================
+         8. ОБНОВЛЕНИЕ ИГРОВОЙ ЛОГИКИ (60 FPS + DELTA TIME)
+         ========================================================================== */
+      function update(dt) {
+        state.time += dt;
+
+        // Скрытие баннера по таймеру
+        if (state.bannerTimer > 0) {
+          state.bannerTimer -= dt;
+          if (state.bannerTimer <= 0) {
+            ui.bannerNotice.classList.remove('show');
+          }
+        }
+
+        if (state.mode !== 'playing') return;
+
+        const p = state.player;
+
+        // --- 1. Обновление игрока ---
+        if (p.invulnTimer > 0) p.invulnTimer -= dt;
+        if (p.dashCooldown > 0) p.dashCooldown = Math.max(0, p.dashCooldown - dt);
+        if (p.fireCooldown > 0) p.fireCooldown -= dt;
+
+        // Регенерация щита
+        if (p.maxShield > 0) {
+          if (p.shieldRegenDelay > 0) {
+            p.shieldRegenDelay -= dt;
+          } else if (p.shield < p.maxShield) {
+            p.shield = Math.min(p.maxShield, p.shield + 14 * dt);
+          }
+        }
+
+        // Движение игрока или рывок
+        if (p.dashTimer > 0) {
+          p.dashTimer -= dt;
+          const dashSpeed = 980;
+          p.x += p.dashDirX * dashSpeed * dt;
+          p.y += p.dashDirY * dashSpeed * dt;
+
+          p.afterimageTimer -= dt;
+          if (p.afterimageTimer <= 0) {
+            p.afterimageTimer = 0.025;
+            state.afterimages.push({
+              x: p.x,
+              y: p.y,
+              angle: p.angle,
+              radius: p.radius,
+              life: 0.22,
+              maxLife: 0.22
+            });
+          }
+        } else {
+          let mx = 0;
+          let my = 0;
+          if (input.keys['KeyW'] || input.keys['ArrowUp']) my -= 1;
+          if (input.keys['KeyS'] || input.keys['ArrowDown']) my += 1;
+          if (input.keys['KeyA'] || input.keys['ArrowLeft']) mx -= 1;
+          if (input.keys['KeyD'] || input.keys['ArrowRight']) mx += 1;
+
+          if (Math.hypot(input.touchMoveX, input.touchMoveY) > 0.1) {
+            mx = input.touchMoveX;
+            my = input.touchMoveY;
+          }
+
+          const len = Math.hypot(mx, my);
+          if (len > 0) {
+            mx /= len;
+            my /= len;
+            const spd = p.baseSpeed * p.speedMult;
+            p.x += mx * spd * dt;
+            p.y += my * spd * dt;
+          }
+        }
+
+        // Границы арены и коллизии с препятствиями для игрока
+        p.x = clamp(p.x, p.radius + 6, ARENA_W - p.radius - 6);
+        p.y = clamp(p.y, p.radius + 6, ARENA_H - p.radius - 6);
+        for (const o of state.obstacles) {
+          resolveCircleRect(p, o);
+        }
+
+        // Прицеливание
+        if (input.isTouch && state.enemies.length > 0) {
+          // На сенсорных экранах авто-наведение на ближайшего врага
+          let nearest = null;
+          let minD = Infinity;
+          for (const e of state.enemies) {
+            const d = dist(p.x, p.y, e.x, e.y);
+            if (d < minD) {
+              minD = d;
+              nearest = e;
+            }
+          }
+          if (nearest) {
+            p.angle = Math.atan2(nearest.y - p.y, nearest.x - p.x);
+          }
+        } else {
+          const worldMouseX = state.cameraX - state.viewW / 2 + input.mouseX;
+          const worldMouseY = state.cameraY - state.viewH / 2 + input.mouseY;
+          p.angle = Math.atan2(worldMouseY - p.y, worldMouseX - p.x);
+        }
+
+        // Стрельба игрока
+        if ((input.mouseDown || input.touchFire) && p.fireCooldown <= 0) {
+          firePlayerWeapon();
+          p.fireCooldown = 1 / (p.baseFireRate * p.fireRateMult);
+        }
+
+        // Орбитальные дроны
+        if (p.droneCount > 0) {
+          p.droneAngle += 2.6 * dt;
+          p.droneFireTimer -= dt;
+          if (p.droneFireTimer <= 0 && state.enemies.length > 0) {
+            p.droneFireTimer = 0.65;
+            for (let i = 0; i < p.droneCount; i++) {
+              const ang = p.droneAngle + (i * Math.PI * 2) / p.droneCount;
+              const dx = p.x + Math.cos(ang) * 46;
+              const dy = p.y + Math.sin(ang) * 46;
+              // Ищем ближайшего врага
+              let target = null;
+              let bestD = 540;
+              for (const e of state.enemies) {
+                const d = dist(dx, dy, e.x, e.y);
+                if (d < bestD) {
+                  bestD = d;
+                  target = e;
+                }
+              }
+              if (target) {
+                const aim = Math.atan2(target.y - dy, target.x - dx);
+                state.bullets.push({
+                  fromPlayer: true,
+                  x: dx,
+                  y: dy,
+                  prevX: dx,
+                  prevY: dy,
+                  vx: Math.cos(aim) * 680,
+                  vy: Math.sin(aim) * 680,
+                  radius: 4,
+                  damage: Math.round(14 * p.damageMult),
+                  color: '#00ff88',
+                  pierceLeft: 0,
+                  bouncesLeft: 0,
+                  hitIds: new Set(),
+                  life: 1.2
+                });
+                audio.droneShoot();
+              }
+            }
+          }
+        }
+
+        // --- 2. Обновление врагов ---
+        updateEnemies(dt);
+
+        // Удаление погибших врагов
+        state.enemies = state.enemies.filter(e => !e._dead);
+
+        // Проверка зачистки сектора -> открытие портала
+        if (state.enemies.length === 0 && !state.portal) {
+          state.portal = {
+            x: ARENA_W / 2,
+            y: ARENA_H / 2,
+            radius: 36,
+            pulse: 0
+          };
+          audio.portalOpen();
+          showBanner('СЕКТОР ЗАЧИЩЕН — ВОЙДИТЕ В НЕОНОВЫЙ ПОРТАЛ В ЦЕНТРЕ', '#00ff88', 4.0);
+        }
+
+        // Взаимодействие с порталом
+        if (state.portal) {
+          state.portal.pulse += dt * 4;
+          if (dist(p.x, p.y, state.portal.x, state.portal.y) < state.portal.radius + p.radius * 0.6) {
+            openImplantSelection();
+            return;
+          }
+        }
+
+        // --- 3. Обновление пуль ---
+        updateBullets(dt);
+
+        // --- 4. Обновление бонусов (pickups) ---
+        for (let i = state.pickups.length - 1; i >= 0; i--) {
+          const pk = state.pickups[i];
+          pk.pulse += dt * 5;
+          const d = dist(p.x, p.y, pk.x, pk.y);
+          // Магнитное притяжение
+          if (d < 150 || state.portal) {
+            const ang = Math.atan2(p.y - pk.y, p.x - pk.x);
+            const pull = state.portal ? 420 : 280;
+            pk.x += Math.cos(ang) * pull * dt;
+            pk.y += Math.sin(ang) * pull * dt;
+          }
+          if (d < p.radius + pk.radius + 6) {
+            audio.pickup();
+            if (pk.type === 'hp') {
+              const heal = Math.min(pk.value, p.maxHp - p.hp);
+              p.hp += heal;
+              spawnFloatingText(p.x, p.y - 18, `+${Math.round(heal)} HP`, '#00ff88', 15);
+            } else {
+              state.score += pk.value;
+              spawnFloatingText(p.x, p.y - 18, `+${pk.value} ДАННЫХ`, '#fcee0a', 14);
+            }
+            state.pickups.splice(i, 1);
+          }
+        }
+
+        // --- 5. Обновление визуальных эффектов ---
+        for (let i = state.particles.length - 1; i >= 0; i--) {
+          const pt = state.particles[i];
+          pt.x += pt.vx * dt;
+          pt.y += pt.vy * dt;
+          pt.vx *= 0.94;
+          pt.vy *= 0.94;
+          pt.life -= dt;
+          if (pt.life <= 0) state.particles.splice(i, 1);
+        }
+
+        for (let i = state.floatingTexts.length - 1; i >= 0; i--) {
+          const ft = state.floatingTexts[i];
+          ft.y += ft.vy * dt;
+          ft.life -= dt;
+          if (ft.life <= 0) state.floatingTexts.splice(i, 1);
+        }
+
+        for (let i = state.afterimages.length - 1; i >= 0; i--) {
+          const ai = state.afterimages[i];
+          ai.life -= dt;
+          if (ai.life <= 0) state.afterimages.splice(i, 1);
+        }
+
+        for (let i = state.shockwaves.length - 1; i >= 0; i--) {
+          const sw = state.shockwaves[i];
+          sw.life -= dt;
+          const progress = 1 - sw.life / sw.maxLife;
+          sw.radius = sw.maxRadius * progress;
+          if (sw.life <= 0) state.shockwaves.splice(i, 1);
+        }
+
+        // --- 6. Плавная камера + тряска ---
+        let lookOffsetX = 0;
+        let lookOffsetY = 0;
+        if (!input.isTouch) {
+          lookOffsetX = (input.mouseX - state.viewW / 2) * 0.14;
+          lookOffsetY = (input.mouseY - state.viewH / 2) * 0.14;
+        }
+        const targetCamX = p.x + lookOffsetX;
+        const targetCamY = p.y + lookOffsetY;
+        state.cameraX += (targetCamX - state.cameraX) * Math.min(1, dt * 8);
+        state.cameraY += (targetCamY - state.cameraY) * Math.min(1, dt * 8);
+
+        // Ограничение камеры пределами арены (если окно меньше арены)
+        const halfW = state.viewW / 2;
+        const halfH = state.viewH / 2;
+        if (ARENA_W > state.viewW) {
+          state.cameraX = clamp(state.cameraX, halfW - 60, ARENA_W - halfW + 60);
+        } else {
+          state.cameraX = ARENA_W / 2;
+        }
+        if (ARENA_H > state.viewH) {
+          state.cameraY = clamp(state.cameraY, halfH - 60, ARENA_H - halfH + 60);
+        } else {
+          state.cameraY = ARENA_H / 2;
+        }
+
+        if (state.screenShake > 0) {
+          state.screenShake = Math.max(0, state.screenShake - 38 * dt);
+        }
+
+        updateHUD();
+      }
+
+      function updateEnemies(dt) {
+        const p = state.player;
+        for (let i = 0; i < state.enemies.length; i++) {
+          const e = state.enemies[i];
+          if (e.hitFlash > 0) e.hitFlash -= dt;
+
+          const toPlayerX = p.x - e.x;
+          const toPlayerY = p.y - e.y;
+          const d = Math.hypot(toPlayerX, toPlayerY) || 1;
+          const ang = Math.atan2(toPlayerY, toPlayerX);
+
+          // Затухание импульса отбрасывания
+          e.vx *= Math.pow(0.08, dt);
+          e.vy *= Math.pow(0.08, dt);
+
+          if (e.stunTimer > 0) {
+            e.stunTimer -= dt;
+          } else if (e.type === 'drone') {
+            // Быстрый преследователь ближнего боя
+            e.angle = ang;
+            e.x += (toPlayerX / d) * e.speed * dt;
+            e.y += (toPlayerY / d) * e.speed * dt;
+          } else if (e.type === 'shooter') {
+            // Держит среднюю дистанцию и стреляет
+            e.angle = ang;
+            if (d > 340) {
+              e.x += (toPlayerX / d) * e.speed * dt;
+              e.y += (toPlayerY / d) * e.speed * dt;
+            } else if (d < 210) {
+              e.x -= (toPlayerX / d) * e.speed * 0.85 * dt;
+              e.y -= (toPlayerY / d) * e.speed * 0.85 * dt;
+            } else {
+              // Стрейф вокруг игрока
+              e.x += (-toPlayerY / d) * e.speed * 0.65 * e.strafeDir * dt;
+              e.y += (toPlayerX / d) * e.speed * 0.65 * e.strafeDir * dt;
+            }
+
+            e.fireTimer -= dt;
+            if (e.fireTimer <= 0) {
+              e.fireTimer = rand(1.45, 2.1);
+              spawnEnemyBullet(e.x, e.y, ang, 390, 14, '#ff2a55', 5);
+              audio.enemyShoot();
+            }
+          } else if (e.type === 'heavy') {
+            // Тяжёлый штурмовик — веер из 3 пуль
+            e.angle = ang;
+            if (d > 260) {
+              e.x += (toPlayerX / d) * e.speed * dt;
+              e.y += (toPlayerY / d) * e.speed * dt;
+            }
+            e.fireTimer -= dt;
+            if (e.fireTimer <= 0) {
+              e.fireTimer = rand(1.9, 2.5);
+              for (let k = -1; k <= 1; k++) {
+                spawnEnemyBullet(e.x, e.y, ang + k * 0.24, 340, 16, '#c084fc', 6);
+              }
+              audio.enemyShoot();
+            }
+          } else if (e.type === 'sniper') {
+            // Кибер-снайпер с лазерным наведением
+            if (e.aimTimer > 0) {
+              // В процессе наведения почти не двигается, плавно доводит прицел
+              e.aimTimer -= dt;
+              const diff = Math.atan2(Math.sin(ang - e.aimAngle), Math.cos(ang - e.aimAngle));
+              e.aimAngle += diff * Math.min(1, dt * 3.5);
+              e.angle = e.aimAngle;
+              if (e.aimTimer <= 0) {
+                // Выстрел быстрым лучом-пулей
+                spawnEnemyBullet(e.x, e.y, e.aimAngle, 960, 24, '#fcee0a', 5);
+                audio.sniperShoot();
+                e.fireTimer = rand(2.3, 3.1);
+              }
+            } else {
+              e.angle = ang;
+              if (d < 360) {
+                e.x -= (toPlayerX / d) * e.speed * dt;
+                e.y -= (toPlayerY / d) * e.speed * dt;
+              } else if (d > 580) {
+                e.x += (toPlayerX / d) * e.speed * dt;
+                e.y += (toPlayerY / d) * e.speed * dt;
+              }
+              e.fireTimer -= dt;
+              if (e.fireTimer <= 0) {
+                e.aimTimer = 1.05; // 1.05 сек лазерного наведения
+                e.aimAngle = ang;
+              }
+            }
+          } else if (e.type === 'boss') {
+            // Босс: плавное движение и чередование 3 паттернов атак
+            e.angle = ang;
+            e.spinAngle += dt * 1.4;
+            if (d > 260) {
+              e.x += (toPlayerX / d) * e.speed * dt;
+              e.y += (toPlayerY / d) * e.speed * dt;
+            } else {
+              e.x += (-toPlayerY / d) * e.speed * 0.7 * dt;
+              e.y += (toPlayerX / d) * e.speed * 0.7 * dt;
+            }
+
+            e.phaseTimer -= dt;
+            if (e.phaseTimer <= 0) {
+              const pat = e.patternIndex % 3;
+              e.patternIndex++;
+              if (pat === 0) {
+                // Кольцевой залп (14 пуль по кругу)
+                const bulletsCount = 14;
+                for (let b = 0; b < bulletsCount; b++) {
+                  const a = e.spinAngle + (b * Math.PI * 2) / bulletsCount;
+                  spawnEnemyBullet(e.x, e.y, a, 320, 16, '#ff00aa', 7);
+                }
+                audio.enemyShoot();
+                e.phaseTimer = 1.25;
+              } else if (pat === 1) {
+                // Прицельный веер из 5 быстрых плазменных зарядов
+                for (let k = -2; k <= 2; k++) {
+                  spawnEnemyBullet(e.x, e.y, ang + k * 0.16, 460, 18, '#fcee0a', 6);
+                }
+                audio.sniperShoot();
+                e.phaseTimer = 1.1;
+              } else {
+                // Двойная спираль
+                for (let b = 0; b < 8; b++) {
+                  const a = ang + (b * Math.PI * 2) / 8;
+                  spawnEnemyBullet(e.x, e.y, a, 370, 16, '#00f3ff', 6);
+                }
+                audio.enemyShoot();
+                e.phaseTimer = 1.35;
+              }
+            }
+          }
+
+          // Применение импульса отбрасывания
+          e.x += e.vx * dt;
+          e.y += e.vy * dt;
+
+          // Расталкивание врагов друг от друга
+          for (let j = i + 1; j < state.enemies.length; j++) {
+            const other = state.enemies[j];
+            const dx = e.x - other.x;
+            const dy = e.y - other.y;
+            const distE = Math.hypot(dx, dy) || 1;
+            const minD = e.radius + other.radius + 4;
+            if (distE < minD) {
+              const push = (minD - distE) * 0.5;
+              e.x += (dx / distE) * push;
+              e.y += (dy / distE) * push;
+              other.x -= (dx / distE) * push;
+              other.y -= (dy / distE) * push;
+            }
+          }
+
+          // Границы арены и коллизии с препятствиями
+          e.x = clamp(e.x, e.radius + 6, ARENA_W - e.radius - 6);
+          e.y = clamp(e.y, e.radius + 6, ARENA_H - e.radius - 6);
+          for (const o of state.obstacles) {
+            resolveCircleRect(e, o);
+          }
+
+          // Контактный урон игроку
+          if (dist(e.x, e.y, p.x, p.y) < e.radius + p.radius - 2) {
+            damagePlayer(e.isBoss ? 25 : 15);
+          }
+        }
+      }
+
+      function spawnEnemyBullet(x, y, angle, speed, damage, color, radius = 5) {
+        state.bullets.push({
+          fromPlayer: false,
+          x,
+          y,
+          prevX: x,
+          prevY: y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius,
+          damage,
+          color,
+          pierceLeft: 0,
+          bouncesLeft: 0,
+          hitIds: null,
+          life: 3.5
+        });
+      }
+
+      function updateBullets(dt) {
+        const p = state.player;
+        for (let i = state.bullets.length - 1; i >= 0; i--) {
+          const b = state.bullets[i];
+          b.prevX = b.x;
+          b.prevY = b.y;
+          b.x += b.vx * dt;
+          b.y += b.vy * dt;
+          b.life -= dt;
+
+          if (b.life <= 0) {
+            state.bullets.splice(i, 1);
+            continue;
+          }
+
+          // Столкновение со стенами арены
+          let hitWall = false;
+          if (b.x - b.radius < 0 || b.x + b.radius > ARENA_W) {
+            if (b.bouncesLeft > 0) {
+              b.vx = -b.vx;
+              b.x = clamp(b.x, b.radius, ARENA_W - b.radius);
+              b.bouncesLeft--;
+              spawnParticles(b.x, b.y, b.color, 5, 130, 2.5, 0.2);
+            } else {
+              hitWall = true;
+            }
+          }
+          if (!hitWall && (b.y - b.radius < 0 || b.y + b.radius > ARENA_H)) {
+            if (b.bouncesLeft > 0) {
+              b.vy = -b.vy;
+              b.y = clamp(b.y, b.radius, ARENA_H - b.radius);
+              b.bouncesLeft--;
+              spawnParticles(b.x, b.y, b.color, 5, 130, 2.5, 0.2);
+            } else {
+              hitWall = true;
+            }
+          }
+
+          if (hitWall) {
+            spawnParticles(b.x, b.y, b.color, 6, 140, 2.5, 0.22);
+            state.bullets.splice(i, 1);
+            continue;
+          }
+
+          // Столкновение с неоновыми колоннами
+          let destroyed = false;
+          for (const o of state.obstacles) {
+            if (pointInRect(b.x, b.y, o, b.radius)) {
+              if (b.bouncesLeft > 0) {
+                // Определяем грань столкновения по предыдущей позиции
+                const wasOutsideX = b.prevX < o.x - b.radius || b.prevX > o.x + o.w + b.radius;
+                if (wasOutsideX) b.vx = -b.vx;
+                else b.vy = -b.vy;
+                b.x = b.prevX;
+                b.y = b.prevY;
+                b.bouncesLeft--;
+                spawnParticles(b.x, b.y, b.color, 5, 130, 2.5, 0.2);
+              } else {
+                spawnParticles(b.x, b.y, b.color, 6, 150, 2.5, 0.22);
+                destroyed = true;
+              }
+              break;
+            }
+          }
+          if (destroyed) {
+            state.bullets.splice(i, 1);
+            continue;
+          }
+
+          // Попадание по целям
+          if (b.fromPlayer) {
+            for (const e of state.enemies) {
+              if (e._dead || b.hitIds.has(e)) continue;
+              if (dist(b.x, b.y, e.x, e.y) < b.radius + e.radius) {
+                b.hitIds.add(e);
+                damageEnemy(e, b.damage, b.color);
+                if (b.pierceLeft > 0) {
+                  b.pierceLeft--;
+                } else {
+                  destroyed = true;
+                  break;
+                }
+              }
+            }
+            if (destroyed) {
+              state.bullets.splice(i, 1);
+            }
+          } else {
+            // Пуля врага -> попадание по игроку
+            if (dist(b.x, b.y, p.x, p.y) < b.radius + p.radius - 2) {
+              damagePlayer(b.damage);
+              state.bullets.splice(i, 1);
+            }
+          }
+        }
+      }
+
+      /* ==========================================================================
+         9. ОТРИСОВКА НА CANVAS (НЕОНОВЫЙ КИБЕРПАНК)
+         ========================================================================== */
+      function render() {
+        const w = state.viewW;
+        const h = state.viewH;
+
+        ctx.save();
+        // Фон
+        ctx.fillStyle = '#050711';
+        ctx.fillRect(0, 0, w, h);
+
+        // Смещение камеры + тряска экрана
+        const shakeX = state.screenShake > 0 ? rand(-state.screenShake, state.screenShake) : 0;
+        const shakeY = state.screenShake > 0 ? rand(-state.screenShake, state.screenShake) : 0;
+        const camOffsetX = Math.round(w / 2 - state.cameraX + shakeX);
+        const camOffsetY = Math.round(h / 2 - state.cameraY + shakeY);
+
+        ctx.translate(camOffsetX, camOffsetY);
+
+        // 1. Неоновая сетка арены
+        drawArenaGrid();
+
+        // 2. Портал перехода (если открыт)
+        if (state.portal) {
+          drawPortal(state.portal);
+        }
+
+        // 3. Неоновые укрытия/колонны
+        drawObstacles();
+
+        // 4. Бонусы (pickups)
+        drawPickups();
+
+        // 5. ЭМИ-волны и ударные кольца
+        drawShockwaves();
+
+        // 6. Шлейф рывка игрока
+        drawAfterimages();
+
+        // 7. Враги и лазерные прицелы снайперов
+        drawEnemies();
+
+        // 8. Игрок и орбитальные дроны
+        if (state.player) {
+          drawPlayer(state.player);
+        }
+
+        // 9. Снаряды (с неоновым свечением)
+        drawBullets();
+
+        // 10. Частицы
+        drawParticles();
+
+        // 11. Всплывающие цифры урона
+        drawFloatingTexts();
+
+        ctx.restore();
+      }
+
+      function drawArenaGrid() {
+        // Заливка пола сектора
+        ctx.fillStyle = '#070b19';
+        ctx.fillRect(0, 0, ARENA_W, ARENA_H);
+
+        // Тонкая неоновая сетка
+        const gridSize = 64;
+        ctx.strokeStyle = 'rgba(0, 243, 255, 0.075)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= ARENA_W; x += gridSize) {
+          ctx.moveTo(x, 0);
+          ctx.lineTo(x, ARENA_H);
+        }
+        for (let y = 0; y <= ARENA_H; y += gridSize) {
+          ctx.moveTo(0, y);
+          ctx.lineTo(ARENA_W, y);
+        }
+        ctx.stroke();
+
+        // Декоративный номер сектора на полу в центре
+        ctx.save();
+        ctx.font = '900 120px Orbitron, sans-serif';
+        ctx.fillStyle = 'rgba(0, 243, 255, 0.035)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(`SEC-${String(state.sector).padStart(2, '0')}`, ARENA_W / 2, ARENA_H / 2);
+        ctx.restore();
+
+        // Светящаяся рамка арены
+        ctx.save();
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#00f3ff';
+        ctx.shadowBlur = 18;
+        ctx.strokeRect(1, 1, ARENA_W - 2, ARENA_H - 2);
+        ctx.restore();
+      }
+
+      function drawObstacles() {
+        for (const o of state.obstacles) {
+          ctx.save();
+          // Тёмный корпус колонны
+          ctx.fillStyle = '#0c1328';
+          ctx.fillRect(o.x, o.y, o.w, o.h);
+
+          // Внутренняя кибер-штриховка
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+          ctx.lineWidth = 1;
+          ctx.strokeRect(o.x + 6, o.y + 6, o.w - 12, o.h - 12);
+
+          // Неоновый контур
+          ctx.strokeStyle = o.color;
+          ctx.lineWidth = 2;
+          ctx.shadowColor = o.color;
+          ctx.shadowBlur = 12;
+          ctx.strokeRect(o.x, o.y, o.w, o.h);
+          ctx.restore();
+        }
+      }
+
+      function drawPortal(portal) {
+        ctx.save();
+        ctx.translate(portal.x, portal.y);
+        const pulseR = portal.radius + Math.sin(portal.pulse) * 5;
+
+        // Внешнее свечение
+        const grad = ctx.createRadialGradient(0, 0, 4, 0, 0, pulseR * 1.4);
+        grad.addColorStop(0, 'rgba(0, 255, 136, 0.85)');
+        grad.addColorStop(0.55, 'rgba(0, 243, 255, 0.35)');
+        grad.addColorStop(1, 'rgba(0, 243, 255, 0)');
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(0, 0, pulseR * 1.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Вращающееся неоновое кольцо
+        ctx.rotate(state.time * 2.5);
+        ctx.strokeStyle = '#00ff88';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 16;
+        ctx.setLineDash([14, 8]);
+        ctx.beginPath();
+        ctx.arc(0, 0, pulseR, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.rotate(-state.time * 4.5);
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(0, 0, pulseR * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.restore();
+
+        // Подпись над порталом
+        ctx.save();
+        ctx.font = '700 12px Orbitron, sans-serif';
+        ctx.fillStyle = '#00ff88';
+        ctx.textAlign = 'center';
+        ctx.shadowColor = '#00ff88';
+        ctx.shadowBlur = 8;
+        ctx.fillText('ПОРТАЛ', portal.x, portal.y - portal.radius - 14);
+        ctx.restore();
+      }
+
+      function drawPickups() {
+        for (const pk of state.pickups) {
+          ctx.save();
+          ctx.translate(pk.x, pk.y);
+          const scale = 1 + Math.sin(pk.pulse) * 0.14;
+          ctx.scale(scale, scale);
+
+          if (pk.type === 'hp') {
+            ctx.fillStyle = '#00ff88';
+            ctx.shadowColor = '#00ff88';
+            ctx.shadowBlur = 12;
+            ctx.fillRect(-3, -9, 6, 18);
+            ctx.fillRect(-9, -3, 18, 6);
+          } else {
+            ctx.rotate(Math.PI / 4);
+            ctx.fillStyle = '#fcee0a';
+            ctx.shadowColor = '#fcee0a';
+            ctx.shadowBlur = 12;
+            ctx.fillRect(-6, -6, 12, 12);
+          }
+          ctx.restore();
+        }
+      }
+
+      function drawShockwaves() {
+        for (const sw of state.shockwaves) {
+          const alpha = clamp(sw.life / sw.maxLife, 0, 1);
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.strokeStyle = sw.color;
+          ctx.lineWidth = sw.width;
+          ctx.shadowColor = sw.color;
+          ctx.shadowBlur = 16;
+          ctx.beginPath();
+          ctx.arc(sw.x, sw.y, sw.radius, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+      }
+
+      function drawAfterimages() {
+        for (const ai of state.afterimages) {
+          const alpha = (ai.life / ai.maxLife) * 0.45;
+          ctx.save();
+          ctx.translate(ai.x, ai.y);
+          ctx.rotate(ai.angle);
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = '#00f3ff';
+          ctx.beginPath();
+          ctx.moveTo(ai.radius + 4, 0);
+          ctx.lineTo(-ai.radius, -ai.radius * 0.78);
+          ctx.lineTo(-ai.radius * 0.55, 0);
+          ctx.lineTo(-ai.radius, ai.radius * 0.78);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      function drawPlayer(p) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+
+        // Энергощит вокруг игрока
+        if (p.shield > 0) {
+          ctx.save();
+          ctx.strokeStyle = 'rgba(0, 243, 255, 0.65)';
+          ctx.lineWidth = 2;
+          ctx.shadowColor = '#00f3ff';
+          ctx.shadowBlur = 14;
+          ctx.beginPath();
+          ctx.arc(0, 0, p.radius + 7, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // Мигание при неуязвимости
+        if (p.invulnTimer > 0 && Math.floor(state.time * 24) % 2 === 0) {
+          ctx.globalAlpha = 0.55;
+        }
+
+        ctx.rotate(p.angle);
+
+        // Кибер-силуэт игрока
+        ctx.fillStyle = '#0a162e';
+        ctx.strokeStyle = '#00f3ff';
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#00f3ff';
+        ctx.shadowBlur = 16;
+
+        ctx.beginPath();
+        ctx.moveTo(p.radius + 5, 0);
+        ctx.lineTo(-p.radius, -p.radius * 0.8);
+        ctx.lineTo(-p.radius * 0.5, 0);
+        ctx.lineTo(-p.radius, p.radius * 0.8);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Светящееся ядро
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(2, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+
+        // Отрисовка орбитальных дронов
+        if (p.droneCount > 0) {
+          for (let i = 0; i < p.droneCount; i++) {
+            const ang = p.droneAngle + (i * Math.PI * 2) / p.droneCount;
+            const dx = p.x + Math.cos(ang) * 46;
+            const dy = p.y + Math.sin(ang) * 46;
+            ctx.save();
+            ctx.translate(dx, dy);
+            ctx.rotate(ang);
+            ctx.fillStyle = '#00ff88';
+            ctx.shadowColor = '#00ff88';
+            ctx.shadowBlur = 12;
+            ctx.beginPath();
+            ctx.arc(0, 0, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+      }
+
+      function drawEnemies() {
+        for (const e of state.enemies) {
+          // Лазерный прицел снайпера
+          if (e.type === 'sniper' && e.aimTimer > 0) {
+            const hit = raycastObstacles(e.x, e.y, e.aimAngle, 950);
+            const urgency = 1 - e.aimTimer / 1.05;
+            ctx.save();
+            ctx.strokeStyle = urgency > 0.7 ? '#ffffff' : '#ff2a55';
+            ctx.lineWidth = 1.2 + urgency * 2.2;
+            ctx.globalAlpha = 0.45 + urgency * 0.55;
+            ctx.shadowColor = '#ff2a55';
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.moveTo(e.x, e.y);
+            ctx.lineTo(hit.x, hit.y);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.save();
+          ctx.translate(e.x, e.y);
+          ctx.rotate(e.isBoss ? e.spinAngle : e.angle);
+
+          const col = e.hitFlash > 0 ? '#ffffff' : e.color;
+          ctx.fillStyle = e.hitFlash > 0 ? '#ffffff' : '#120b24';
+          ctx.strokeStyle = col;
+          ctx.lineWidth = e.isBoss ? 3.5 : 2.2;
+          ctx.shadowColor = col;
+          ctx.shadowBlur = e.isBoss ? 22 : 12;
+
+          if (e.type === 'drone') {
+            // Острый треугольник
+            ctx.beginPath();
+            ctx.moveTo(e.radius + 3, 0);
+            ctx.lineTo(-e.radius, -e.radius * 0.85);
+            ctx.lineTo(-e.radius * 0.4, 0);
+            ctx.lineTo(-e.radius, e.radius * 0.85);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          } else if (e.type === 'shooter') {
+            // Ромб с пушкой
+            ctx.beginPath();
+            ctx.moveTo(e.radius + 4, 0);
+            ctx.lineTo(0, -e.radius);
+            ctx.lineTo(-e.radius, 0);
+            ctx.lineTo(0, e.radius);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          } else if (e.type === 'heavy') {
+            // Тяжёлый шестиугольник
+            ctx.beginPath();
+            for (let k = 0; k < 6; k++) {
+              const a = (k * Math.PI * 2) / 6;
+              const px = Math.cos(a) * e.radius;
+              const py = Math.sin(a) * e.radius;
+              if (k === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          } else if (e.type === 'sniper') {
+            // Вытянутый ромб с оптическим глазом
+            ctx.beginPath();
+            ctx.moveTo(e.radius + 7, 0);
+            ctx.lineTo(-e.radius * 0.4, -e.radius * 0.75);
+            ctx.lineTo(-e.radius, 0);
+            ctx.lineTo(-e.radius * 0.4, e.radius * 0.75);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          } else if (e.type === 'boss') {
+            // Крупный восьмиугольный мех/ядро ИИ
+            ctx.beginPath();
+            for (let k = 0; k < 8; k++) {
+              const a = (k * Math.PI * 2) / 8;
+              const r = k % 2 === 0 ? e.radius : e.radius * 0.78;
+              const px = Math.cos(a) * r;
+              const py = Math.sin(a) * r;
+              if (k === 0) ctx.moveTo(px, py);
+              else ctx.lineTo(px, py);
+            }
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Внутреннее ядро босса
+            ctx.fillStyle = '#ff00aa';
+            ctx.beginPath();
+            ctx.arc(0, 0, e.radius * 0.34, 0, Math.PI * 2);
+            ctx.fill();
+          }
+
+          ctx.restore();
+
+          // Мини-полоска здоровья над обычными врагами (если ранены)
+          if (!e.isBoss && e.hp < e.maxHp) {
+            const bw = e.radius * 2.1;
+            const bh = 4;
+            const bx = e.x - bw / 2;
+            const by = e.y - e.radius - 11;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.65)';
+            ctx.fillRect(bx, by, bw, bh);
+            ctx.fillStyle = e.color;
+            ctx.fillRect(bx, by, bw * clamp(e.hp / e.maxHp, 0, 1), bh);
+          }
+        }
+      }
+
+      function drawBullets() {
+        for (const b of state.bullets) {
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          ctx.shadowColor = b.color;
+          ctx.shadowBlur = 14;
+
+          // Светящийся хвост пули
+          ctx.strokeStyle = b.color;
+          ctx.lineWidth = b.radius * 1.4;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(b.x, b.y);
+          ctx.lineTo(b.x - b.vx * 0.022, b.y - b.vy * 0.022);
+          ctx.stroke();
+
+          ctx.beginPath();
+          ctx.arc(b.x, b.y, b.radius * 0.75, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      }
+
+      function drawParticles() {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        for (const pt of state.particles) {
+          const alpha = clamp(pt.life / pt.maxLife, 0, 1);
+          ctx.globalAlpha = alpha;
+          ctx.fillStyle = pt.color;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      function drawFloatingTexts() {
+        ctx.save();
+        ctx.textAlign = 'center';
+        for (const ft of state.floatingTexts) {
+          const alpha = clamp(ft.life / ft.maxLife, 0, 1);
+          ctx.globalAlpha = alpha;
+          ctx.font = `700 ${ft.size}px "JetBrains Mono", monospace`;
+          ctx.fillStyle = ft.color;
+          ctx.shadowColor = ft.color;
+          ctx.shadowBlur = 6;
+          ctx.fillText(ft.text, ft.x, ft.y);
+        }
+        ctx.restore();
+      }
+
+      /* ==========================================================================
+         10. УПРАВЛЕНИЕ UI, ИМПЛАНТАМИ И ЭКРАНАМИ
+         ========================================================================== */
+      function updateHUD() {
+        const p = state.player;
+        if (!p) return;
+
+        ui.hpText.textContent = `${Math.ceil(p.hp)} / ${p.maxHp}`;
+        ui.hpFill.style.width = `${clamp((p.hp / p.maxHp) * 100, 0, 100)}%`;
+
+        if (p.maxShield > 0) {
+          ui.shieldBarGroup.style.display = 'block';
+          ui.shieldText.textContent = `${Math.ceil(p.shield)} / ${p.maxShield}`;
+          ui.shieldFill.style.width = `${clamp((p.shield / p.maxShield) * 100, 0, 100)}%`;
+        } else {
+          ui.shieldBarGroup.style.display = 'none';
+        }
+
+        const totalDashCd = p.baseDashCooldown * p.dashCooldownMult;
+        const dashPct = p.dashCooldown <= 0 ? 100 : ((totalDashCd - p.dashCooldown) / totalDashCd) * 100;
+        ui.dashFill.style.width = `${clamp(dashPct, 0, 100)}%`;
+        ui.dashText.textContent = p.dashCooldown <= 0 ? 'ГОТОВ' : `${p.dashCooldown.toFixed(1)}с`;
+
+        ui.sectorVal.textContent = String(state.sector).padStart(2, '0');
+        ui.enemiesVal.textContent = state.enemies.length;
+        ui.scoreVal.textContent = Math.floor(state.score);
+
+        // Полоса босса
+        const boss = state.enemies.find(e => e.isBoss);
+        if (boss) {
+          ui.bossBarContainer.classList.add('visible');
+          ui.bossName.textContent = boss.name;
+          const pct = clamp((boss.hp / boss.maxHp) * 100, 0, 100);
+          ui.bossHpFill.style.width = `${pct}%`;
+          ui.bossHpText.textContent = `${Math.ceil(pct)}%`;
+        } else {
+          ui.bossBarContainer.classList.remove('visible');
+        }
+      }
+
+      function renderInstalledImplants() {
+        ui.implantsBar.innerHTML = '';
+        const p = state.player;
+        if (!p) return;
+
+        for (const [id, count] of Object.entries(p.implants)) {
+          const imp = IMPLANTS.find(i => i.id === id);
+          if (!imp) continue;
+          const rarityInfo = RARITY[imp.rarity];
+          const chip = document.createElement('div');
+          chip.className = 'implant-chip';
+          chip.style.borderColor = rarityInfo.color;
+          chip.setAttribute('data-tooltip', `${imp.name} (x${count}): ${imp.desc}`);
+          chip.innerHTML = `${imp.icon}${count > 1 ? `<span class="stack-count">x${count}</span>` : ''}`;
+          ui.implantsBar.appendChild(chip);
+        }
+      }
+
+      function pickRandomImplants(count = 3) {
+        const pool = [...IMPLANTS];
+        const chosen = [];
+        for (let i = 0; i < count && pool.length > 0; i++) {
+          const totalWeight = pool.reduce((sum, item) => sum + RARITY[item.rarity].weight, 0);
+          let roll = Math.random() * totalWeight;
+          let pickedIdx = 0;
+          for (let j = 0; j < pool.length; j++) {
+            roll -= RARITY[pool[j].rarity].weight;
+            if (roll <= 0) {
+              pickedIdx = j;
+              break;
+            }
+          }
+          chosen.push(pool.splice(pickedIdx, 1)[0]);
+        }
+        return chosen;
+      }
+
+      function openImplantSelection() {
+        state.mode = 'implant';
+        input.mouseDown = false;
+        input.touchFire = false;
+
+        const choices = pickRandomImplants(3);
+        ui.implantsGrid.innerHTML = '';
+
+        choices.forEach((imp) => {
+          const rInfo = RARITY[imp.rarity];
+          const currentCount = state.player.implants[imp.id] || 0;
+          const card = document.createElement('div');
+          card.className = 'implant-card';
+          card.style.setProperty('--card-color', rInfo.color);
+          card.style.setProperty('--card-glow', rInfo.glow);
+          card.innerHTML = `
+            <div class="rarity-tag">${rInfo.label}${currentCount > 0 ? ` • УР. ${currentCount + 1}` : ''}</div>
+            <div class="implant-icon">${imp.icon}</div>
+            <div class="implant-name">${imp.name}</div>
+            <div class="implant-desc">${imp.desc}</div>
+            <div class="implant-cta">[ УСТАНОВИТЬ МОДУЛЬ ]</div>
+          `;
+          card.addEventListener('click', () => selectImplant(imp));
+          ui.implantsGrid.appendChild(card);
+        });
+
+        ui.implantOverlay.classList.add('active');
+      }
+
+      function selectImplant(imp) {
+        audio.implantSelect();
+        imp.apply(state.player);
+        state.player.implants[imp.id] = (state.player.implants[imp.id] || 0) + 1;
+        renderInstalledImplants();
+
+        ui.implantOverlay.classList.remove('active');
+        state.sector += 1;
+        state.score += 250;
+        saveRecords();
+        generateSector(state.sector);
+        state.mode = 'playing';
+      }
+
+      function startNewGame() {
+        audio.init();
+        state.sector = 1;
+        state.score = 0;
+        state.kills = 0;
+        state.particles = [];
+        state.floatingTexts = [];
+        state.afterimages = [];
+        state.shockwaves = [];
+        state.player = createPlayer();
+        state.cameraX = ARENA_W / 2;
+        state.cameraY = ARENA_H / 2;
+
+        renderInstalledImplants();
+        generateSector(1);
+
+        ui.startOverlay.classList.remove('active');
+        ui.pauseOverlay.classList.remove('active');
+        ui.gameOverOverlay.classList.remove('active');
+        ui.implantOverlay.classList.remove('active');
+        ui.hud.classList.remove('hidden');
+
+        state.mode = 'playing';
+        updateHUD();
+      }
+
+      function togglePause() {
+        if (state.mode === 'playing') {
+          state.mode = 'paused';
+          input.mouseDown = false;
+          ui.pauseOverlay.classList.add('active');
+        } else if (state.mode === 'paused') {
+          state.mode = 'playing';
+          ui.pauseOverlay.classList.remove('active');
+        }
+      }
+
+      function triggerGameOver() {
+        state.mode = 'gameover';
+        input.mouseDown = false;
+        input.touchFire = false;
+        saveRecords();
+
+        ui.goSectors.textContent = Math.max(0, state.sector - 1);
+        ui.goKills.textContent = state.kills;
+        ui.goScore.textContent = Math.floor(state.score);
+        ui.goBest.textContent = state.records.bestScore;
+
+        ui.gameOverOverlay.classList.add('active');
+      }
+
+      function syncMuteButtons() {
+        const icon = audio.muted ? '🔇' : '🔊';
+        ui.muteBtn.textContent = icon;
+        ui.muteBtn.classList.toggle('muted', audio.muted);
+        ui.pauseMuteBtn.textContent = audio.muted ? '🔇 ЗВУК: ВЫКЛ' : '🔊 ЗВУК: ВКЛ';
+      }
+
+      /* ==========================================================================
+         11. ОБРАБОТЧИКИ СОБЫТИЙ (КЛАВИАТУРА, МЫШЬ, СЕНСОР, РЕСАЙЗ)
+         ========================================================================== */
+      function resizeCanvas() {
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        state.viewW = window.innerWidth;
+        state.viewH = window.innerHeight;
+        canvas.width = Math.floor(state.viewW * dpr);
+        canvas.height = Math.floor(state.viewH * dpr);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      window.addEventListener('resize', resizeCanvas);
+
+      window.addEventListener('keydown', (e) => {
+        input.keys[e.code] = true;
+        if ((e.code === 'Space' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') && state.mode === 'playing') {
+          e.preventDefault();
+          triggerDash();
+        }
+        if (e.code === 'Escape' || e.code === 'KeyP') {
+          if (state.mode === 'playing' || state.mode === 'paused') {
+            togglePause();
+          }
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        input.keys[e.code] = false;
+      });
+
+      canvas.addEventListener('mousemove', (e) => {
+        input.mouseX = e.clientX;
+        input.mouseY = e.clientY;
+      });
+
+      canvas.addEventListener('mousedown', (e) => {
+        if (e.button === 0) {
+          audio.init();
+          input.mouseDown = true;
+        }
+      });
+
+      window.addEventListener('mouseup', (e) => {
+        if (e.button === 0) input.mouseDown = false;
+      });
+
+      window.addEventListener('blur', () => {
+        input.mouseDown = false;
+        input.keys = {};
+      });
+
+      // Сенсорное управление для мобильных устройств
+      function initTouchSupport() {
+        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (!isTouchDevice) return;
+        input.isTouch = true;
+        ui.touchControls.style.display = 'block';
+
+        let stickTouchId = null;
+        const maxRadius = 42;
+
+        ui.touchStickArea.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          audio.init();
+          const t = e.changedTouches[0];
+          stickTouchId = t.identifier;
+          updateStick(t.clientX, t.clientY);
+        });
+
+        window.addEventListener('touchmove', (e) => {
+          if (stickTouchId === null) return;
+          for (const t of e.changedTouches) {
+            if (t.identifier === stickTouchId) {
+              updateStick(t.clientX, t.clientY);
+            }
+          }
+        }, { passive: false });
+
+        window.addEventListener('touchend', (e) => {
+          for (const t of e.changedTouches) {
+            if (t.identifier === stickTouchId) {
+              stickTouchId = null;
+              input.touchMoveX = 0;
+              input.touchMoveY = 0;
+              ui.touchStickKnob.style.transform = 'translate(0px, 0px)';
+            }
+          }
+        });
+
+        function updateStick(cx, cy) {
+          const rect = ui.touchStickArea.getBoundingClientRect();
+          const centerX = rect.left + rect.width / 2;
+          const centerY = rect.top + rect.height / 2;
+          let dx = cx - centerX;
+          let dy = cy - centerY;
+          const d = Math.hypot(dx, dy);
+          if (d > maxRadius) {
+            dx = (dx / d) * maxRadius;
+            dy = (dy / d) * maxRadius;
+          }
+          input.touchMoveX = dx / maxRadius;
+          input.touchMoveY = dy / maxRadius;
+          ui.touchStickKnob.style.transform = `translate(${dx}px, ${dy}px)`;
+        }
+
+        ui.touchDashBtn.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          if (state.mode === 'playing') triggerDash();
+        });
+
+        ui.touchFireBtn.addEventListener('touchstart', (e) => {
+          e.preventDefault();
+          audio.init();
+          input.touchFire = true;
+        });
+        ui.touchFireBtn.addEventListener('touchend', (e) => {
+          e.preventDefault();
+          input.touchFire = false;
+        });
+      }
+
+      // Кнопки интерфейса
+      document.getElementById('startBtn').addEventListener('click', startNewGame);
+      document.getElementById('restartBtn').addEventListener('click', startNewGame);
+      document.getElementById('resumeBtn').addEventListener('click', togglePause);
+      document.getElementById('pauseRestartBtn').addEventListener('click', startNewGame);
+      ui.pauseBtn.addEventListener('click', togglePause);
+
+      const handleMute = () => {
+        audio.init();
+        audio.toggleMute();
+        syncMuteButtons();
+      };
+      ui.muteBtn.addEventListener('click', handleMute);
+      ui.pauseMuteBtn.addEventListener('click', handleMute);
+
+      /* ==========================================================================
+         12. ГЛАВНЫЙ ЦИКЛ ИГРЫ
+         ========================================================================== */
+      let lastTime = 0;
+      function gameLoop(timestamp) {
+        const dt = Math.min((timestamp - lastTime) / 1000 || 0.016, 0.05);
+        lastTime = timestamp;
+
+        update(dt);
+        render();
+
+        requestAnimationFrame(gameLoop);
+      }
+
+      window.onload = function () {
+        resizeCanvas();
+        loadRecords();
+        initTouchSupport();
+        syncMuteButtons();
+        lastTime = performance.now();
+        requestAnimationFrame(gameLoop);
+      };
+    })();
+  </script>
+</body>
+</html>
